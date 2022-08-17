@@ -137,9 +137,9 @@ def g3groupfinder_luminosity(radeg,dedeg,cz,absrmag,dwarfgiantdivide,fof_bperp=0
 
     ### if values not passed, fit rproj and vproj vs. N_giants
     if (rproj_fit_params is None) or (vproj_fit_params is None):
-        if center_mode='average':
+        if center_mode=='average':
             giantgrpra, giantgrpdec, giantgrpcz = fof.group_skycoords(radeg[giantsel], dedeg[giantsel], cz[giantsel], giantfofid)
-        elif center_mode='BCG':
+        elif center_mode=='BCG':
             giantgrpra, giantgrpdec, giantgrpcz = fof.BCG_center(radeg[giantsel], dedeg[giantsel], cz[giantsel], absrmag[giantsel], giantfofid)
         relvel = np.abs(giantgrpcz - cz[giantsel])
         #relprojdist = (giantgrpcz + cz[giantsel])/H0 * np.sin(ic.angular_separation(giantgrpra, giantgrpdec, radeg[giantsel], dedeg[giantsel])/2.0)
@@ -178,9 +178,9 @@ def g3groupfinder_luminosity(radeg,dedeg,cz,absrmag,dwarfgiantdivide,fof_bperp=0
 
     ### associate dwarfs to giant-only groups
     dwarfsel = (absrmag<dwarfgiantdivide)
-    if center_mode='average':
+    if center_mode=='average':
         giantgrpra, giantgrpdec, giantgrpcz = fof.group_skycoords(radeg[giantsel], dedeg[giantsel], cz[giantsel], giantfofid)
-    elif center_mode='BCG':
+    elif center_mode=='BCG':
         giantgrpra, giantgrpdec, giantgrpcz = fof.BCG_center(radeg[giantsel], dedeg[giantsel], cz[giantsel], absrmag[giantsel], giantfofid)
     giantgrpn = fof.multiplcitiy_function(g3grpid[giantsel],return_by_galaxy=True)
     dwarfassocid, _ = fof.fast_faint_assoc(radeg[dwarfsel],dedeg[dwarfsel],cz[dwarfsel],giantgrpra,giantgrpdec,giantgrpcz,g3grpid[giantsel],\
