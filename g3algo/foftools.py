@@ -28,17 +28,14 @@ import time
 import warnings
 from numba import njit
 
-__versioninfo__ = "foftools version 4.0 (previous version 3.3 now labeled `objectbasedfoftools.py`)"
-
 from astropy.cosmology import LambdaCDM
-cosmo = LambdaCDM(H0=100.0, Om0=0.3, Ode0=0.7) # this puts everything in "per h" units.
 SPEED_OF_LIGHT = 3.00E+05 # km/s
 
 
 # -------------------------------------------------------------- #
 #  friends-of-friends (FOF) algorithm
 # -------------------------------------------------------------- #
-def fast_fof(ra, dec, cz, bperp, blos, s, printConf=True):
+def fast_fof(ra, dec, cz, bperp, blos, s, H0=100.,Om0=0.3,Ode0=0.7,printConf=True):
     """
     -----------
     Compute group membership from galaxies' equatorial coordinates using a friends-of-friends algorithm,
@@ -59,6 +56,7 @@ def fast_fof(ra, dec, cz, bperp, blos, s, printConf=True):
                 The list will have shape len(ra).
     -----------
     """
+    cosmo = LambdaCDM(H0=H0, Om0=Om0, Ode0=Ode0) # this puts everything in "per h" units.
     t1 = time.time()
     Ngalaxies = len(ra)
     ra = np.float64(ra)
@@ -131,7 +129,7 @@ def pfof_integral(z, czi, czerri, czj, czerrj, VL):
     return gauss(z, czi/c, czerri/c) * (0.5*math.erf((z+VL-czj/c)/((2**0.5)*czerrj/c)) - 0.5*math.erf((z-VL-czj/c)/((2**0.5)*czerrj/c)))
 
 
-def fast_pfof(ra, dec, cz, czerr, perpll, losll, Pth, printConf=True):
+def fast_pfof(ra, dec, cz, czerr, perpll, losll, Pth, H0=100., Om0=0.3, Ode0=0.7, printConf=True):
     """
     -----
     Compute group membership from galaxies' equatorial  coordinates using a probabilitiy
@@ -139,7 +137,8 @@ def fast_pfof(ra, dec, cz, czerr, perpll, losll, Pth, printConf=True):
     a variant of FoF (see `foftools.fast_fof`, Berlind+2006), which treats galaxies as Gaussian
     probability distributions, allowing group membership selection to account for the 
     redshift errors of photometric redshift measurements. 
-    
+    In this function, the linking length must be fixed.   
+ 
     Arguments:
         ra (iterable): list of right-ascesnsion coordinates of galaxies in decimal degrees.
         dec (iterable): list of declination coordinates of galaxies in decimal degrees.
@@ -155,7 +154,7 @@ def fast_pfof(ra, dec, cz, czerr, perpll, losll, Pth, printConf=True):
                 The list will have shape len(ra).
     -----
     """
-    print('you know.... you could speed this up more if check for transverse friendship before integrating...')
+    cosmo = LambdaCDM(H0=H0, Om0=Om0, Ode0=Ode0) # this puts everything in "per h" units.
     t1 = time.time()
     Ngalaxies = len(ra)
     ra = np.float32(ra)
@@ -182,7 +181,7 @@ def fast_pfof(ra, dec, cz, czerr, perpll, losll, Pth, printConf=True):
     VL = losll/c
     for i in range(0,Ngalaxies):
         for j in range(0, i+1):
-            if j<i:
+            if j<i and dperp[i][j]<=perpll:
                 val = quad(pfof_integral, 0, 100, args=(cz[i], czerr[i], cz[j], czerr[j], VL),\
                            points=np.float64([cz[i]/c-5*czerr[i]/c,cz[i]/c-3*czerr[i]/c, cz[i]/c, cz[i]/c+3*czerr[i]/c, cz[i]/c+5*czerr[i]/c]),\
                             wvar=cz[i]/c)
@@ -273,7 +272,7 @@ def get_group_ind(matrix, active_row_num, visited):
 #  functions for galaxy association to existing groups
 # -------------------------------------------------------------- #
 
-def fast_faint_assoc(faintra, faintdec, faintcz, grpra, grpdec, grpcz, grpid, radius_boundary, velocity_boundary, losll=-1):
+def fast_faint_assoc(faintra, faintdec, faintcz, grpra, grpdec, grpcz, grpid, radius_boundary, velocity_boundary, losll=-1, H0=100., Om0=0.3, Ode0=0.7):
     """
     Associate galaxies to a group catalog based on given radius and velocity boundaries, based on a method
     similar to that presented in Eckert+ 2016. 
@@ -309,12 +308,13 @@ def fast_faint_assoc(faintra, faintdec, faintcz, grpra, grpdec, grpcz, grpid, ra
     assoc_flag : iterable
         association flag for every galaxy (see function description). Length matches `faintra`.
     """
+    cosmo = LambdaCDM(H0=H0, Om0=Om0, Ode0=Ode0) # this puts everything in "per h" units.
     velocity_boundary=np.asarray(velocity_boundary)
     radius_boundary=np.asarray(radius_boundary)
     Nfaint = len(faintra)
     assoc_grpid = np.zeros(Nfaint).astype(int)
     assoc_flag = np.zeros(Nfaint).astype(int)
-    r2plusv2=np.zeros(Nfaint)
+    radius_ratio=np.zeros(Nfaint)
 
     # resize group coordinates to be the # of groups, not # galaxies
     junk, uniqind = np.unique(grpid, return_index=True)
@@ -343,20 +343,20 @@ def fast_faint_assoc(faintra, faintdec, faintcz, grpra, grpdec, grpcz, grpid, ra
 
     for gg in range(0,len(grpid)):
         for fg in range(0,Nfaint):
-            tmpvalue = Rp[fg][gg]/radius_boundary[gg]*Rp[fg][gg]/radius_boundary[gg] + DeltaV[fg][gg]/velocity_boundary[gg]*DeltaV[fg][gg]/velocity_boundary[gg] 
-            condition=((Rp[fg][gg]<radius_boundary[gg]) and (DeltaV[fg][gg]<velocity_boundary[gg]))
+            tempratio = Rp[fg][gg]/radius_boundary[gg]
+            condition=((tempratio<1) and (DeltaV[fg][gg]<velocity_boundary[gg]))
             # multiple groups competing (has already been associated before)
             if condition and assoc_flag[fg]:
                 # multiple grps competing to associate galaxy
-                if tmpvalue<r2plusv2[fg]:
-                    r2plusv2[fg]=tmpvalue
+                if tempratio<radius_ratio[fg]:
+                    radius_ratio[fg]=tempratio
                     assoc_grpid[fg]=grpid[gg]
                     assoc_flag[fg]=1
                 else:
                     pass
             # galaxy not associated yet - go ahead and do it
             elif condition and (not assoc_flag[fg]):
-                r2plusv2[fg]=tmpvalue
+                radius_ratio[fg]=tempratio
                 assoc_grpid[fg]=grpid[gg]
                 assoc_flag[fg]=1
             # condition not met
@@ -541,7 +541,9 @@ def get_grprproj_e17(galra, galdec, galcz, galgrpid, h):
        Observed local group-corrected radial velocities of input galaxies (km/s)
     galgrpid : iterable
        Group ID numbers for input galaxies, length matches `galra`.
-
+    h : float
+        Little h.
+    
     Returns
     --------------------
     grprproj : np.array
@@ -695,4 +697,110 @@ def sepmodel(x, a, b, c, d, e):
 
 def giantmodel(x, a, b):
     return np.abs(a)*np.log(np.abs(b)*x+1)
+
+
+def flag_edges_2D(ra, dec, grpid, rarange, decrange, R0):
+    """
+    Given a group catalog, flag individual groups for 
+    possible spatial incompleteness due to survey edge
+    cutoffs. 
+
+    Note that for surveys whose RA ranges contain the 0/360
+    wrap-around, this must be handled manually before applying
+    this function. In this case, `ra` and `rarange` should be
+    remapped such that high RAs are negative (e.g. RA = 350 
+    would be equivalent to -10).
+
+    Parameters
+    ----------------------
+    ra : array_like
+        Right ascension of each galaxy in decimal degrees.
+    dec : array_like
+        Declination of each galaxy in decimal degrees.
+    grpid : array_like
+        Group ID number for each galaxy.
+    rarange : tuple
+        Two-element tuple containing boundaries for right-ascension.
+    decrange : tuple
+        Two-element tuple containing boundaries for declination.    
+    R0 : scalar
+        Characteristic angular separation by which to determine if
+        groups is near edge (e.g. an FoF spatial linking length).
+        Should be expressed in decimal degrees.
+
+    Returns
+    -----------------------
+    edgeflag : np.array
+        1/0 flag for each galaxy, indicating whether the galaxy's
+        group is potentially contaminated by survey edge effects.
+    """
+    R0 = R0*np.pi/180. # convert to rad
+    ra=np.asarray(ra)
+    dec=np.asarray(dec)
+    grpid=np.asarray(grpid)
+    ramin, ramax = rarange[0], rarange[1]
+    decmin, decmax = decrange[0], decrange[1]
+    edgeflag=np.zeros_like(grpid).astype(int)
+    for uid in np.unique(grpid):
+        grpsel = np.where(grpid==uid)
+        grpra = ra[grpsel]
+        grpdec = dec[grpsel]
+        # check if any group galaxies outside RA/Dec range
+        outofRArange = (grpra>ramax).any() | (grpra<ramin).any()
+        outofDecrange = (grpdec>decmax).any() | (grpdec<decmin).any()
+        if outofRArange or outofDecrange:
+            edgeflag[grpsel]=1
+        else:
+            # check angular radius to outermost galaxy
+            #grpsep = angular_separation(grpra, grpdec, grpra[:,None], grpdec[:,None])
+            Dright = angular_separation(grpra, grpdec, np.zeros_like(grpra)+ramax, grpdec)
+            Dleft = angular_separation(grpra, grpdec, np.zeros_like(grpra)+ramin, grpdec)
+            Dtop = angular_separation(grpra, grpdec, grpra, np.zeros_like(grpdec)+decmax)
+            Dbottom = angular_separation(grpra, grpdec, grpra, np.zeros_like(grpdec)+decmin)
+            #nearedge = (Dright<grpsep).any() | (Dleft<grpsep).any() | (Dtop<grpsep).any() | (Dbottom<grpsep).any()
+            nearedge = (Dright<R0).any() | (Dleft<R0).any() | (Dtop<R0).any() | (Dbottom<R0).any()
+            edgeflag[grpsel]=int(nearedge)
+    return edgeflag
+
+
+def dynmass(galra,galdec,galcz,galgrpid,Aval=9.9,h=0.7):
+    """
+    Compute dynamical masses of galaxy groups using the method
+    outlined in Eckert et al. (2017), section 2.3.3. 
+
+    Parameters
+    -----------------
+    galra, galdec, galcz : iterable
+        Arrays containing galaxy coordinates in decimal degrees, km/s.
+    galgrpid : iterable
+        Array containing group ID number for every galaxy.
+    Aval : float
+        Scalar factor for which to scale masses (see E17 discussion).
+        Default 9.9.
+    h : scalar
+        Hubble constant / (100 km/s/Mpc). Default 0.7
+
+    Returns
+    ------------------
+    mdyn:
+        log dynamical mass of each galaxy's group [solar masses].
+        Galaxies in N<=2 groups are assigned values of 0.
+    """
+    Rproj=get_grprproj_e17(galra, galdec, galcz, galgrpid, h)
+    sigma_squared = np.zeros_like(Rproj)
+    for ii,gg in enumerate(np.unique(galgrpid)):
+        sel = np.where(galgrpid==gg)
+        nn=len(sel[0])
+        if nn>2:
+            ii=np.arange(1,nn+1)
+            weight=ii*(nn-ii)
+            tmp = np.sqrt(np.pi)/(nn*nn-nn) * np.sum(np.diff(np.sort(galcz[sel]))*weight[:-1])
+            sigma_squared[sel]=tmp*tmp
+        else:
+           sigma_squared[sel]=-99.
+    GG = 4.3e-9 # Mpc km^2 s^-2 M_sun^-1
+    mdyn = Aval*sigma_squared*Rproj/GG
+    sel=np.where(galgrpid==881.)
+    mdyn[np.where(mdyn<=0)]=1.
+    return np.log10(mdyn)
 
