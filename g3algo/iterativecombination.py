@@ -11,14 +11,13 @@ import sys
 from IPython import get_ipython
 ipython = get_ipython()
 
-HUBBLE_CONST = 100.
 
 """
 Zackary Huthens - zhutchen [at] live.unc.edu
 University of North Carolina at Chapel Hill
 """
 
-def iterative_combination(galaxyra, galaxydec, galaxycz, galaxymag, rprojboundary, vprojboundary, centermethod, decisionmode, starting_id=1):
+def iterative_combination(galaxyra, galaxydec, galaxycz, galaxymag, rprojboundary, vprojboundary, centermethod, decisionmode, starting_id=1, HUBBLE_CONST=100.):
     """
     Perform iterative combination on a list of input galaxies.
     
@@ -62,7 +61,7 @@ def iterative_combination(galaxyra, galaxydec, galaxycz, galaxymag, rprojboundar
         print("iteration {} in progress...".format(niter))
         # Compute based on updated ID number
         olditassocid = itassocid
-        itassocid = nearest_neighbor_assign(galaxyra, galaxydec, galaxycz, galaxymag, olditassocid, rprojboundary, vprojboundary, centermethod, decisionmode)
+        itassocid = nearest_neighbor_assign(galaxyra, galaxydec, galaxycz, galaxymag, olditassocid, rprojboundary, vprojboundary, centermethod, decisionmode, HUBBLE_CONST)
         # check for convergence
         converged = np.array_equal(olditassocid, itassocid)
         niter+=1
@@ -143,7 +142,7 @@ def group_skycoords(galaxyra, galaxydec, galaxycz, galaxygrpid):
     return groupra, groupdec, groupcz
 
 
-def nearest_neighbor_assign(galaxyra, galaxydec, galaxycz, galaxymag, grpid, rprojboundary, vprojboundary, centermethod, decisionmode):
+def nearest_neighbor_assign(galaxyra, galaxydec, galaxycz, galaxymag, grpid, rprojboundary, vprojboundary, centermethod, decisionmode, HUBBLE_CONST):
     """
     For a list of galaxies defined by groups, refine group ID numbers using a nearest-neighbor
     search and applying the search boundaries.
@@ -201,7 +200,7 @@ def nearest_neighbor_assign(galaxyra, galaxydec, galaxycz, galaxymag, grpid, rpr
         combinedra,combineddec,combinedcz = np.hstack((galaxyra[Gpgalsel],galaxyra[GNNgalsel])),np.hstack((galaxydec[Gpgalsel],galaxydec[GNNgalsel])),np.hstack((galaxycz[Gpgalsel],galaxycz[GNNgalsel]))
         combinedmag = np.hstack((galaxymag[Gpgalsel], galaxymag[GNNgalsel]))
         combinedgalgrpid = np.hstack((grpid[Gpgalsel],grpid[GNNgalsel]))
-        if fit_in_group(combinedra, combineddec, combinedcz, combinedgalgrpid, combinedmag, rprojboundary, vprojboundary, centermethod, decisionmode) and (not alreadydone[idx]) and (not alreadydone[nbridx]):
+        if fit_in_group(combinedra, combineddec, combinedcz, combinedgalgrpid, combinedmag, rprojboundary, vprojboundary, centermethod, decisionmode, HUBBLE_CONST) and (not alreadydone[idx]) and (not alreadydone[nbridx]):
             # check for reciprocity: is the nearest-neighbor of GNN Gp? If not, leave them both as they are and let it be handled during the next iteration.
             nbrnnidx = nnind[nbridx]
             if idx==nbrnnidx:
@@ -216,7 +215,7 @@ def nearest_neighbor_assign(galaxyra, galaxydec, galaxycz, galaxymag, grpid, rpr
     return associd  
 
 
-def fit_in_group(galra, galdec, galcz, galgrpid, galmag, rprojboundary, vprojboundary, center='arithmetic', decisionmode = 'allgalaxies'):
+def fit_in_group(galra, galdec, galcz, galgrpid, galmag, rprojboundary, vprojboundary, center='arithmetic', decisionmode = 'allgalaxies', HUBBLE_CONST=100.):
     """
     Check whether two potential groups can be merged based on the integrated luminosity of the 
     potential members, given limiting input group sizes.
