@@ -146,10 +146,10 @@ def g3groupfinder_luminosity(radeg,dedeg,cz,absrmag,dwarfgiantdivide,fof_bperp=0
     ### giant-only FoF ----------------- # 
     giantsel = (absrmag<=dwarfgiantdivide)
     if fof_sep is not None:
-        giantfofid = fof.fast_fof(radeg[giantsel],dedeg[giantsel],cz[giantsel],fof_bperp,fof_blos,fof_sep)
+        giantfofid = fof.fast_fof(radeg[giantsel],dedeg[giantsel],cz[giantsel],fof_bperp,fof_blos,fof_sep,H0=H0,Om0=Om0,Ode0=Ode0)
     else:
         fof_sep = (volume/np.sum(giantsel))**(1/3.)
-        giantfofid = fof.fast_fof(radeg[giantsel],dedeg[giantsel],cz[giantsel],fof_bperp,fof_blos,fof_sep)
+        giantfofid = fof.fast_fof(radeg[giantsel],dedeg[giantsel],cz[giantsel],fof_bperp,fof_blos,fof_sep,H0=H0,Om0=Om0,Ode0=Ode0)
     g3grpid[giantsel] = giantfofid
 
     ### if values not passed, fit rproj and vproj vs. N_giants
@@ -202,7 +202,7 @@ def g3groupfinder_luminosity(radeg,dedeg,cz,absrmag,dwarfgiantdivide,fof_bperp=0
         giantgrpra, giantgrpdec, giantgrpcz = fof.BCG_center(radeg[giantsel], dedeg[giantsel], cz[giantsel], absrmag[giantsel], giantfofid)
     giantgrpn = fof.multiplicity_function(g3grpid[giantsel],return_by_galaxy=True)
     dwarfassocid, _ = fof.fast_faint_assoc(radeg[dwarfsel],dedeg[dwarfsel],cz[dwarfsel],giantgrpra,giantgrpdec,giantgrpcz,g3grpid[giantsel],\
-        rproj_boundary(giantgrpn),vproj_boundary(giantgrpn))
+        rproj_boundary(giantgrpn),vproj_boundary(giantgrpn), H0=H0,Om0=Om0,Ode0=Ode0)
     g3grpid[dwarfsel]=dwarfassocid
 
     ### if values not passed, fit rproj and vproj for giants+dwarfs vs. Ltot
@@ -243,7 +243,7 @@ def g3groupfinder_luminosity(radeg,dedeg,cz,absrmag,dwarfgiantdivide,fof_bperp=0
     grpnafterassoc = fof.multiplicity_function(g3grpid, return_by_galaxy=True)
     _ungroupeddwarf_sel = (absrmag>dwarfgiantdivide) & (grpnafterassoc==1)    
     itassocid = ic.iterative_combination(radeg[_ungroupeddwarf_sel], dedeg[_ungroupeddwarf_sel], cz[_ungroupeddwarf_sel], absrmag[_ungroupeddwarf_sel],\
-                                           rproj_for_iteration, vproj_for_iteration, starting_id=np.max(g3grpid)+1, centermethod=ic_center_mode, decisionmode=ic_decision_mode)
+                   rproj_for_iteration, vproj_for_iteration, starting_id=np.max(g3grpid)+1, centermethod=ic_center_mode, decisionmode=ic_decision_mode, H0=H0)
     g3grpid[_ungroupeddwarf_sel]=itassocid
     ### ------------  return quantities
     return g3grpid, g3ssid, fof_sep, rproj_bestfit, rproj_bestfit_err, vproj_bestfit, vproj_bestfit_err, gd_rproj_bestfit, gd_rproj_bestfit_err, gd_vproj_bestfit, gd_vproj_bestfit_err 
