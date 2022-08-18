@@ -1,7 +1,24 @@
+import matplotlib
+matplotlib.use('TkAgg')
+import matplotlib.pyplot as plt
 import numpy as np
 import foftools as fof
 import iterativecombination as ic
 from astropy.cosmology import LambdaCDM
+from scipy.interpolate import interp1d 
+from scipy.optimize import curve_fit
+from center_binned_stats import center_binned_stats
+from smoothedbootstrap import smoothedbootstrap as sbs
+
+def sigmarange(x):
+    q84, q16 = np.percentile(x, [84 ,16])
+    return (q84-q16)/2.
+
+def giantmodel(x, a, b):
+    return np.abs(a)*np.log10(np.abs(b)*x+1)
+
+def decayexp(x, a, b):
+    return np.abs(a)*np.exp(-1*np.abs(b)*x)#+np.abs(d)
 
 def g3groupfinder_luminosity(radeg,dedeg,cz,absrmag,dwarfgiantdivide,fof_bperp=0.07,fof_blos=1.1,fof_sep=None, volume=None, center_mode='average',\
                  iterative_giant_only_groups=False, n_bootstraps=10000, rproj_fit_guess=None, rproj_fit_params = None, rproj_fit_multiplier=None,\
@@ -127,7 +144,7 @@ def g3groupfinder_luminosity(radeg,dedeg,cz,absrmag,dwarfgiantdivide,fof_bperp=0
     cosmo = LambdaCDM(H0=H0,Om0=Om0,Ode0=Ode0)
     SPEED_OF_LIGHT=2.998e+5
     ### giant-only FoF ----------------- # 
-    giantsel = (absrmag<dwarfgiantdivide)
+    giantsel = (absrmag<=dwarfgiantdivide)
     if fof_sep is not None:
         giantfofid = fof.fast_fof(radeg[giantsel],dedeg[giantsel],cz[giantsel],fof_bperp,fof_blos,fof_sep)
     else:
@@ -143,8 +160,8 @@ def g3groupfinder_luminosity(radeg,dedeg,cz,absrmag,dwarfgiantdivide,fof_bperp=0
             giantgrpra, giantgrpdec, giantgrpcz = fof.BCG_center(radeg[giantsel], dedeg[giantsel], cz[giantsel], absrmag[giantsel], giantfofid)
         relvel = np.abs(giantgrpcz - cz[giantsel])
         #relprojdist = (giantgrpcz + cz[giantsel])/H0 * np.sin(ic.angular_separation(giantgrpra, giantgrpdec, radeg[giantsel], dedeg[giantsel])/2.0)
-        grp_ctd = cosmo.comoving_transverse_distance(giantgrpcz/SPEED_OF_LIGHT)
-        gia_ctd = cosmo.comoving_transverse_distance(cz[giantsel]/SPEED_OF_LIGHT)
+        grp_ctd = cosmo.comoving_transverse_distance(giantgrpcz/SPEED_OF_LIGHT).value
+        gia_ctd = cosmo.comoving_transverse_distance(cz[giantsel]/SPEED_OF_LIGHT).value
         relprojdist = (grp_ctd+gia_ctd)*np.sin(ic.angular_separation(giantgrpra, giantgrpdec, radeg[giantsel], dedeg[giantsel])/2.0)
         giantgrpn = fof.multiplicity_function(giantfofid, return_by_galaxy=True)
         uniqgiantgrpn, uniqindex = np.unique(giantgrpn, return_index=True)
@@ -160,7 +177,7 @@ def g3groupfinder_luminosity(radeg,dedeg,cz,absrmag,dwarfgiantdivide,fof_bperp=0
         rproj_bestfit = np.array(rproj_fit_params)
         rproj_bestfit_err = np.zeros(2)*1.
     if vproj_fit_params is None:
-        vproj_bestfit, vproj_bestfit_cov  = curve_fit(giantmodel, uniqecogiantgrpn[keepcalsel], median_relvel, sigma=dvproj_median_error, p0=vproj_fit_guess)
+        vproj_bestfit, vproj_bestfit_cov  = curve_fit(giantmodel, uniqgiantgrpn[keepcalsel], median_relvel, sigma=dvproj_median_error, p0=vproj_fit_guess)
         vproj_bestfit_err = np.sqrt(np.diag(vproj_bestfit_cov))
     else:
         vproj_bestfit = np.array(vproj_fit_params)
@@ -172,17 +189,18 @@ def g3groupfinder_luminosity(radeg,dedeg,cz,absrmag,dwarfgiantdivide,fof_bperp=0
     ### if requested, merge giant-only FoF groups through iterative combination
     if iterative_giant_only_groups:
         revisedgiantgrpid = iterative_combination_giants(radeg[giantsel],dedeg[giantsel],cz[giantsel],giantfofid,rproj_boundary,vproj_boundary,ic_decision_mode,H0)
+        g3ssid[giantsel] = giantfofid
         g3grpid[giantsel] = revisedgiantgrpid
     else:
         pass
 
     ### associate dwarfs to giant-only groups
-    dwarfsel = (absrmag<dwarfgiantdivide)
+    dwarfsel = (absrmag>dwarfgiantdivide)
     if center_mode=='average':
         giantgrpra, giantgrpdec, giantgrpcz = fof.group_skycoords(radeg[giantsel], dedeg[giantsel], cz[giantsel], giantfofid)
     elif center_mode=='BCG':
         giantgrpra, giantgrpdec, giantgrpcz = fof.BCG_center(radeg[giantsel], dedeg[giantsel], cz[giantsel], absrmag[giantsel], giantfofid)
-    giantgrpn = fof.multiplcitiy_function(g3grpid[giantsel],return_by_galaxy=True)
+    giantgrpn = fof.multiplicity_function(g3grpid[giantsel],return_by_galaxy=True)
     dwarfassocid, _ = fof.fast_faint_assoc(radeg[dwarfsel],dedeg[dwarfsel],cz[dwarfsel],giantgrpra,giantgrpdec,giantgrpcz,g3grpid[giantsel],\
         rproj_boundary(giantgrpn),vproj_boundary(giantgrpn))
     g3grpid[dwarfsel]=dwarfassocid
@@ -190,16 +208,16 @@ def g3groupfinder_luminosity(radeg,dedeg,cz,absrmag,dwarfgiantdivide,fof_bperp=0
     ### if values not passed, fit rproj and vproj for giants+dwarfs vs. Ltot
     if (gd_rproj_fit_params is None) or (gd_vproj_fit_params is None):
         gdgrpn = fof.multiplicity_function(g3grpid, return_by_galaxy=True)
-        gdsel = np.logical_not(np.logical_or(g3grpid==-99., ((gdgrpn==1) & (absrmag>dwargiantdivide)))) 
+        gdsel = np.logical_not(np.logical_or(g3grpid==-99., ((gdgrpn==1) & (absrmag>dwarfgiantdivide)))) 
         gdgrpra, gdgrpdec, gdgrpcz = fof.group_skycoords(radeg[gdsel], dedeg[gdsel], cz[gdsel], g3grpid[gdsel])
         gdrelvel = np.abs(gdgrpcz - cz[gdsel])
-        ctd1 = cosmo.comoving_transverse_distance(gdgrpcz/SPEED_OF_LIGHT)
-        ctd2 = cosmo.comoving_transverse_distance(cz[gdsel]/SPEED_OF_LIGHT)
+        ctd1 = cosmo.comoving_transverse_distance(gdgrpcz/SPEED_OF_LIGHT).value
+        ctd2 = cosmo.comoving_transverse_distance(cz[gdsel]/SPEED_OF_LIGHT).value
         gdrelprojdist = (ctd1 + ctd2) * np.sin(ic.angular_separation(gdgrpra, gdgrpdec, radeg[gdsel], dedeg[gdsel])/2.0)
         #gdrelprojdist = (gdgrpcz + cz[gdsel])/H0 * np.sin(ic.angular_separation(gdgrpra, gdgrpdec, radeg[gdsel], dedeg[gdsel])/2.0)
         gdn = gdgrpn[gdsel]
         gdtotalmag = ic.get_int_mag(absrmag[gdsel], g3grpid[gdsel])
-        binsel = np.where(np.logical_and(gdn>1, gdtotalmag>np.min(gd_fit_bins))) # test here
+        binsel = np.where(np.logical_and(gdn>1, gdtotalmag>-24))#np.min(gd_fit_bins))) # test here
         gdmedianrproj, magbincenters, agbinedges, jk = center_binned_stats(gdtotalmag[binsel], gdrelprojdist[binsel], np.median, bins=gd_fit_bins)
         gdmedianrproj_err, jk, jk, jk = center_binned_stats(gdtotalmag[binsel], gdrelprojdist[binsel], sigmarange, bins=gd_fit_bins)
         gdmedianrelvel, jk, jk, jk = center_binned_stats(gdtotalmag[binsel], gdrelvel[binsel], np.median, bins=gd_fit_bins)
@@ -212,7 +230,7 @@ def g3groupfinder_luminosity(radeg,dedeg,cz,absrmag,dwarfgiantdivide,fof_bperp=0
         gd_rproj_bestfit = np.array(gd_rproj_fit_params)
         gd_rproj_bestfit_err = np.zeros(len(gd_rproj_fit_params))*1.
     if (gd_vproj_fit_params is None):
-        gd_vproj_bestfit, gd_vproj_cov=curve_fit(decayexp, magbincenters[~nansel], gdmedianvproj[~nansel], p0=gd_vproj_fit_guess)
+        gd_vproj_bestfit, gd_vproj_cov=curve_fit(decayexp, magbincenters[~nansel], gdmedianrelvel[~nansel], p0=gd_vproj_fit_guess)
         gd_vproj_bestfit_err = np.sqrt(np.diag(gd_vproj_cov))
     else:
         gd_vproj_bestfit = np.array(gd_vproj_fit_params)
@@ -223,9 +241,9 @@ def g3groupfinder_luminosity(radeg,dedeg,cz,absrmag,dwarfgiantdivide,fof_bperp=0
     ### --------- iterative combination to make dwarf-only groups
     assert (g3grpid[(absrmag<=dwarfgiantdivide)]!=-99.).all(), "Not all giants are grouped." 
     grpnafterassoc = fof.multiplicity_function(g3grpid, return_by_galaxy=True)
-    _ungroupeddwarf_sel = (absrmag>dwarfgiantdivde) & (grpnafterassoc==1)    
+    _ungroupeddwarf_sel = (absrmag>dwarfgiantdivide) & (grpnafterassoc==1)    
     itassocid = ic.iterative_combination(radeg[_ungroupeddwarf_sel], dedeg[_ungroupeddwarf_sel], cz[_ungroupeddwarf_sel], absrmag[_ungroupeddwarf_sel],\
-                                           rproj_for_iteration, vproj_for_iteration, starting_id=np.max(ecog3grpid)+1, centermethod=ic_center_mode, decisionmode=ic_decision_mode)
+                                           rproj_for_iteration, vproj_for_iteration, starting_id=np.max(g3grpid)+1, centermethod=ic_center_mode, decisionmode=ic_decision_mode)
     g3grpid[_ungroupeddwarf_sel]=itassocid
     ### ------------  return quantities
-    return g3grpid, g3ssid, fof_sep, rproj_bestfit, rproj_bestfit_err, vproj_bestfit, vproj_bestfit_err 
+    return g3grpid, g3ssid, fof_sep, rproj_bestfit, rproj_bestfit_err, vproj_bestfit, vproj_bestfit_err, gd_rproj_bestfit, gd_rproj_bestfit_err, gd_vproj_bestfit, gd_vproj_bestfit_err 

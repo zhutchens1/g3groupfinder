@@ -285,7 +285,7 @@ def fit_in_group(galra, galdec, galcz, galgrpid, galmag, rprojboundary, vprojbou
         halfangle = angular_separation(seed1grpra[0],seed1grpdec[0],seed2grpra[0],seed2grpdec[0])/2.
         rprojsep = (seed1grpcz[0]+seed2grpcz[0])/HUBBLE_CONST * np.sin(halfangle)
         lossep = np.abs(seed1grpcz[0]-seed2grpcz[0])
-        fitingroup=((rprojsep<rprojboundary(memberintmag)) and (lossep<vprojboundary(memberintmag))) 
+        fitingroup=((rprojsep<rprojboundary(memberintmag)).all() and (lossep<vprojboundary(memberintmag)).all()) 
     else:
         assert False, "Function argument `decisionmode` must be either `allgalaxies` or `centers`."
         sys.exit()
