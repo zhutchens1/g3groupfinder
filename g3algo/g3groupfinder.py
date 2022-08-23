@@ -9,7 +9,7 @@ from scipy.interpolate import interp1d
 from scipy.optimize import curve_fit
 from center_binned_stats import center_binned_stats
 from smoothedbootstrap import smoothedbootstrap as sbs
-
+from giantonlyic import iterative_combination_giants
 def sigmarange(x):
     q84, q16 = np.percentile(x, [84 ,16])
     return (q84-q16)/2.
@@ -185,7 +185,9 @@ def g3groupfinder_luminosity(radeg,dedeg,cz,absrmag,dwarfgiantdivide,fof_bperp=0
     
     rproj_boundary = lambda Ngiants: rproj_fit_multiplier*giantmodel(Ngiants, *rproj_bestfit)
     vproj_boundary = lambda Ngiants: vproj_fit_multiplier*giantmodel(Ngiants, *vproj_bestfit)
-    
+    print('-----------------------')
+    print(rproj_boundary(2)) 
+    print('------------------------')
     ### if requested, merge giant-only FoF groups through iterative combination
     if iterative_giant_only_groups:
         revisedgiantgrpid = iterative_combination_giants(radeg[giantsel],dedeg[giantsel],cz[giantsel],giantfofid,rproj_boundary,vproj_boundary,ic_decision_mode,H0)
@@ -197,9 +199,9 @@ def g3groupfinder_luminosity(radeg,dedeg,cz,absrmag,dwarfgiantdivide,fof_bperp=0
     ### associate dwarfs to giant-only groups
     dwarfsel = (absrmag>dwarfgiantdivide)
     if center_mode=='average':
-        giantgrpra, giantgrpdec, giantgrpcz = fof.group_skycoords(radeg[giantsel], dedeg[giantsel], cz[giantsel], giantfofid)
+        giantgrpra, giantgrpdec, giantgrpcz = fof.group_skycoords(radeg[giantsel], dedeg[giantsel], cz[giantsel], g3grpid[giantsel])
     elif center_mode=='BCG':
-        giantgrpra, giantgrpdec, giantgrpcz = fof.BCG_center(radeg[giantsel], dedeg[giantsel], cz[giantsel], absrmag[giantsel], giantfofid)
+        giantgrpra, giantgrpdec, giantgrpcz = fof.BCG_center(radeg[giantsel], dedeg[giantsel], cz[giantsel], absrmag[giantsel], g3grpid[giantsel])
     giantgrpn = fof.multiplicity_function(g3grpid[giantsel],return_by_galaxy=True)
     dwarfassocid, _ = fof.fast_faint_assoc(radeg[dwarfsel],dedeg[dwarfsel],cz[dwarfsel],giantgrpra,giantgrpdec,giantgrpcz,g3grpid[giantsel],\
         rproj_boundary(giantgrpn),vproj_boundary(giantgrpn), H0=H0,Om0=Om0,Ode0=Ode0)
@@ -223,6 +225,10 @@ def g3groupfinder_luminosity(radeg,dedeg,cz,absrmag,dwarfgiantdivide,fof_bperp=0
         gdmedianrelvel, jk, jk, jk = center_binned_stats(gdtotalmag[binsel], gdrelvel[binsel], np.median, bins=gd_fit_bins)
         gdmedianrelvel_err, jk, jk, jk = center_binned_stats(gdtotalmag[binsel], gdrelvel[binsel], sigmarange, bins=gd_fit_bins)
         nansel = np.isnan(gdmedianrproj)
+        plt.figure()
+        plt.scatter(gdtotalmag[binsel],gdrelprojdist[binsel],s=2)
+        plt.gca().invert_xaxis()
+        plt.show()
     if (gd_rproj_fit_params is None):
         gd_rproj_bestfit, gd_rproj_cov=curve_fit(decayexp, magbincenters[~nansel], gdmedianrproj[~nansel], p0=gd_rproj_fit_guess)
         gd_rproj_bestfit_err = np.sqrt(np.diag(gd_rproj_cov))

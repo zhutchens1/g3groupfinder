@@ -16,7 +16,7 @@ ipython = get_ipython()
 from smoothedbootstrap import smoothedbootstrap as sbs
 from scipy.optimize import curve_fit
 from scipy.stats import mode 
-
+import testingnewiterativecombination as ic
 def giantmodel(x, a, b):
     return np.abs(a)*np.log10(np.abs(b)*x+1)
 
@@ -190,11 +190,15 @@ def giants_fit_in_group(galra, galdec, galcz, galgrpid, rprojboundary, vprojboun
         seed1grpra,seed1grpdec,seed1grpcz = fof.group_skycoords(galra[seed1sel],galdec[seed1sel],galcz[seed1sel],galgrpid[seed1sel])
         seed2sel = (galgrpid==uniqIDnums[1])
         seed2grpra,seed2grpdec,seed2grpcz = fof.group_skycoords(galra[seed2sel],galdec[seed2sel],galcz[seed2sel],galgrpid[seed2sel])
-        halfangle = fof.angular_separation(seed1grpra[0],seed1grpdec[0],seed2grpra[0],seed2grpdec[0])/2.
-        rprojsep = (seed1grpcz[0]+seed2grpcz[0])/HUBBLE_CONST * np.sin(halfangle)
-        lossep = np.abs(seed1grpcz[0]-seed2grpcz[0])
+        allgrpra,allgrpdec,allgrpcz = fof.group_skycoords(galra, galdec, galcz, np.zeros_like(galra)) # center of all galaxies
+        seed1radialsep = (seed1grpcz[0]+allgrpcz[0])/100. * np.sin(fof.angular_separation(allgrpra[0],allgrpdec[0],seed1grpra[0],seed1grpdec[0])/2.)
+        seed1lossep = np.abs(seed1grpcz[0]-allgrpcz[0])
+        seed2radialsep = (seed2grpcz[0]+allgrpcz[0])/100. * np.sin(fof.angular_separation(allgrpra[0],allgrpdec[0],seed2grpra[0],seed2grpdec[0])/2.)
+        seed2lossep = np.abs(seed2grpcz[0]-allgrpcz[0])
         totalgrpN = len(seed1grpra)+len(seed2grpra)
-        fitingroup=((rprojsep<rprojboundary(totalgrpN).all()) and (lossep<vprojboundary(totalgrpN)).all())
+        fitingroup1 = (seed1radialsep<rproj_boundary(totalgrpN)).all() and (seed1lossep<vproj_boundary(totalgrpN)).all()
+        fitingroup2 = (seed2radialsep<rproj_boundary(totalgrpN)).all() and (seed2lossep<vproj_boundary(totalgrpN)).all()
+        fitingroup = fitingroup1 and fitingroup2
     else:
         assert False, "Function argument `decisionmode` must be either `allgalaxies` or `centers`."
         sys.exit()
@@ -232,7 +236,7 @@ if __name__=='__main__':
     # iterative combination, giants
     itergiantfofid = iterative_combination_giants(eco.radeg,eco.dedeg,eco.cz,giantfofid,rproj_boundary,vproj_boundary,decisionmode='centers',H0=100.)
 
-    if False:
+    if True:
         plt.figure()
         binv = np.arange(0.5,500.5,1)
         plt.hist(fof.multiplicity_function(giantfofid), bins=binv, log=True, histtype='step', color='k',hatch='//',label='Giant-only FoF')
@@ -240,7 +244,21 @@ if __name__=='__main__':
         plt.legend(loc='best')
         plt.xlabel("Number of Giant Galaxies per Group")
         plt.ylabel("Number of Giant-Only Groups")
-        plt.show() 
+        plt.show()
+    if True:
+        groupintmag = ic.get_int_mag(eco.absrmag.to_numpy(), itergiantfofid)
+        ecogiantgrpra, ecogiantgrpdec, ecogiantgrpcz = fof.group_skycoords(np.array(eco.radeg), np.array(eco.dedeg), np.array(eco.cz), itergiantfofid)
+        relvel = np.abs(ecogiantgrpcz - np.array(eco.cz))
+        relprojdist = (ecogiantgrpcz + np.array(eco.cz))/100. * fof.angular_separation(ecogiantgrpra, ecogiantgrpdec, np.array(eco.radeg), np.array(eco.dedeg))/2.0
+        giantgrpn = fof.multiplicity_function(itergiantfofid,return_by_galaxy=True)
+        print(min(giantgrpn),max(giantgrpn))
+        plt.figure()
+        plt.axhline(rproj_boundary(2))
+        plt.scatter(groupintmag, relprojdist, color='k', s=2)
+        plt.xlim(-24,-19)
+        #plt.ylim(0,0.8)
+        plt.gca().invert_xaxis()
+        plt.show()
 
     coma_id,_ = mode(giantfofid)
     print(coma_id) 
