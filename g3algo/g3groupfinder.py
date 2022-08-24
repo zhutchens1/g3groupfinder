@@ -225,10 +225,6 @@ def g3groupfinder_luminosity(radeg,dedeg,cz,absrmag,dwarfgiantdivide,fof_bperp=0
         gdmedianrelvel, jk, jk, jk = center_binned_stats(gdtotalmag[binsel], gdrelvel[binsel], np.median, bins=gd_fit_bins)
         gdmedianrelvel_err, jk, jk, jk = center_binned_stats(gdtotalmag[binsel], gdrelvel[binsel], sigmarange, bins=gd_fit_bins)
         nansel = np.isnan(gdmedianrproj)
-        plt.figure()
-        plt.scatter(gdtotalmag[binsel],gdrelprojdist[binsel],s=2)
-        plt.gca().invert_xaxis()
-        plt.show()
     if (gd_rproj_fit_params is None):
         gd_rproj_bestfit, gd_rproj_cov=curve_fit(decayexp, magbincenters[~nansel], gdmedianrproj[~nansel], p0=gd_rproj_fit_guess)
         gd_rproj_bestfit_err = np.sqrt(np.diag(gd_rproj_cov))

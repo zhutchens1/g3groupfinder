@@ -11,14 +11,13 @@ import sys
 from IPython import get_ipython
 ipython = get_ipython()
 
-HUBBLE_CONST = 100.
 
 """
 Zackary Huthens - zhutchen [at] live.unc.edu
 University of North Carolina at Chapel Hill
 """
 
-def iterative_combination(galaxyra, galaxydec, galaxycz, galaxymag, rprojboundary, vprojboundary, centermethod, decisionmode, starting_id=1):
+def iterative_combination(galaxyra, galaxydec, galaxycz, galaxymag, rprojboundary, vprojboundary, centermethod, decisionmode, starting_id=1, H0=100.):
     """
     Perform iterative combination on a list of input galaxies.
     
@@ -62,7 +61,7 @@ def iterative_combination(galaxyra, galaxydec, galaxycz, galaxymag, rprojboundar
         print("iteration {} in progress...".format(niter))
         # Compute based on updated ID number
         olditassocid = itassocid
-        itassocid = nearest_neighbor_assign(galaxyra, galaxydec, galaxycz, galaxymag, olditassocid, rprojboundary, vprojboundary, centermethod, decisionmode)
+        itassocid = nearest_neighbor_assign(galaxyra, galaxydec, galaxycz, galaxymag, olditassocid, rprojboundary, vprojboundary, centermethod, decisionmode, H0=H0)
         # check for convergence
         converged = np.array_equal(olditassocid, itassocid)
         niter+=1
@@ -143,7 +142,7 @@ def group_skycoords(galaxyra, galaxydec, galaxycz, galaxygrpid):
     return groupra, groupdec, groupcz
 
 
-def nearest_neighbor_assign(galaxyra, galaxydec, galaxycz, galaxymag, grpid, rprojboundary, vprojboundary, centermethod, decisionmode):
+def nearest_neighbor_assign(galaxyra, galaxydec, galaxycz, galaxymag, grpid, rprojboundary, vprojboundary, centermethod, decisionmode, H0):
     """
     For a list of galaxies defined by groups, refine group ID numbers using a nearest-neighbor
     search and applying the search boundaries.
@@ -178,12 +177,12 @@ def nearest_neighbor_assign(galaxyra, galaxydec, galaxycz, galaxymag, grpid, rpr
     # Build & query the K-D Tree
     potphi = potra*np.pi/180.
     pottheta = np.pi/2. - potdec*np.pi/180.
-    #zmpc = potcz/HUBBLE_CONST
+    #zmpc = potcz/H0
     #xmpc = 2.*np.pi*zmpc*potra*np.cos(np.pi*potdec/180.) / 360.
     #ympc = np.float64(2.*np.pi*zmpc*potdec / 360.)
-    zmpc = potcz/HUBBLE_CONST * np.cos(pottheta) 
-    xmpc = potcz/HUBBLE_CONST*np.sin(pottheta)*np.cos(potphi)
-    ympc = potcz/HUBBLE_CONST*np.sin(pottheta)*np.sin(potphi)
+    zmpc = potcz/H0 * np.cos(pottheta) 
+    xmpc = potcz/H0*np.sin(pottheta)*np.cos(potphi)
+    ympc = potcz/H0*np.sin(pottheta)*np.sin(potphi)
     coords = np.array([xmpc, ympc, zmpc]).T
     kdt = cKDTree(coords)
     nndist, nnind = kdt.query(coords,k=2)
@@ -201,7 +200,7 @@ def nearest_neighbor_assign(galaxyra, galaxydec, galaxycz, galaxymag, grpid, rpr
         combinedra,combineddec,combinedcz = np.hstack((galaxyra[Gpgalsel],galaxyra[GNNgalsel])),np.hstack((galaxydec[Gpgalsel],galaxydec[GNNgalsel])),np.hstack((galaxycz[Gpgalsel],galaxycz[GNNgalsel]))
         combinedmag = np.hstack((galaxymag[Gpgalsel], galaxymag[GNNgalsel]))
         combinedgalgrpid = np.hstack((grpid[Gpgalsel],grpid[GNNgalsel]))
-        if fit_in_group(combinedra, combineddec, combinedcz, combinedgalgrpid, combinedmag, rprojboundary, vprojboundary, centermethod, decisionmode) and (not alreadydone[idx]) and (not alreadydone[nbridx]):
+        if fit_in_group(combinedra, combineddec, combinedcz, combinedgalgrpid, combinedmag, rprojboundary, vprojboundary, centermethod, decisionmode, H0) and (not alreadydone[idx]) and (not alreadydone[nbridx]):
             # check for reciprocity: is the nearest-neighbor of GNN Gp? If not, leave them both as they are and let it be handled during the next iteration.
             nbrnnidx = nnind[nbridx]
             if idx==nbrnnidx:
@@ -216,7 +215,7 @@ def nearest_neighbor_assign(galaxyra, galaxydec, galaxycz, galaxymag, grpid, rpr
     return associd  
 
 
-def fit_in_group(galra, galdec, galcz, galgrpid, galmag, rprojboundary, vprojboundary, center='arithmetic', decisionmode = 'allgalaxies'):
+def fit_in_group(galra, galdec, galcz, galgrpid, galmag, rprojboundary, vprojboundary, center='arithmetic', decisionmode = 'allgalaxies', H0=100.):
     """
     Check whether two potential groups can be merged based on the integrated luminosity of the 
     potential members, given limiting input group sizes.
@@ -272,23 +271,23 @@ def fit_in_group(galra, galdec, galcz, galgrpid, galmag, rprojboundary, vprojbou
             racenter = np.arctan(ycen/xcen)*(180.0/np.pi)+phicorr
         # check if all members are within rproj and vproj of group center
         halfangle = angular_separation(racenter,deccenter,galra[:,None],galdec[:,None])/2.0
-        rprojsep = (galcz[:,None]+czcenter)/HUBBLE_CONST * halfangle
+        rprojsep = (galcz[:,None]+czcenter)/H0 * halfangle
         lossep = np.abs(galcz[:,None]-czcenter)
         fitingroup=(np.all(rprojsep<rprojboundary(memberintmag)) and np.all(lossep<vprojboundary(memberintmag)))
     elif decisionmode=='centers':
         uniqIDnums = np.unique(galgrpid)
         assert len(uniqIDnums)==2, "galgrpid must have two unique entries (two seed groups)."
         seed1sel = (galgrpid==uniqIDnums[0])
-        seed1grpra,seed1grpdec,seed1grpcz = fof.group_skycoords(galra[seed1sel],galdec[seed1sel],galcz[seed1sel],galgrpid[seed1sel])
+        seed1grpra,seed1grpdec,seed1grpcz = group_skycoords(galra[seed1sel],galdec[seed1sel],galcz[seed1sel],galgrpid[seed1sel])
         seed2sel = (galgrpid==uniqIDnums[1])
-        seed2grpra,seed2grpdec,seed2grpcz = fof.group_skycoords(galra[seed2sel],galdec[seed2sel],galcz[seed2sel],galgrpid[seed2sel])
-        allgrpra,allgrpdec,allgrpcz = fof.group_skycoords(galra, galdec, galcz, np.zeros_like(galra)) # center of all galaxies
-        seed1radialsep = (seed1grpcz[0]+allgrpcz[0])/100. * np.sin(fof.angular_separation(allgrpra[0],allgrpdec[0],seed1grpra[0],seed1grpdec[0])/2.)
+        seed2grpra,seed2grpdec,seed2grpcz = group_skycoords(galra[seed2sel],galdec[seed2sel],galcz[seed2sel],galgrpid[seed2sel])
+        allgrpra,allgrpdec,allgrpcz = group_skycoords(galra, galdec, galcz, np.zeros_like(galra)) # center of all galaxies
+        seed1radialsep = (seed1grpcz[0]+allgrpcz[0])/100. * np.sin(angular_separation(allgrpra[0],allgrpdec[0],seed1grpra[0],seed1grpdec[0])/2.)
         seed1lossep = np.abs(seed1grpcz[0]-allgrpcz[0])
-        seed2radialsep = (seed2grpcz[0]+allgrpcz[0])/100. * np.sin(fof.angular_separation(allgrpra[0],allgrpdec[0],seed2grpra[0],seed2grpdec[0])/2.)
+        seed2radialsep = (seed2grpcz[0]+allgrpcz[0])/100. * np.sin(angular_separation(allgrpra[0],allgrpdec[0],seed2grpra[0],seed2grpdec[0])/2.)
         seed2lossep = np.abs(seed2grpcz[0]-allgrpcz[0])
-        fitingroup1 = (seed1radialsep<rproj_boundary(memberintmag)).all() and (seed1lossep<vproj_boundary(memberintmag)).all()
-        fitingroup2 = (seed2radialsep<rproj_boundary(memberintmag)).all() and (seed2lossep<vproj_boundary(memberintmag)).all()
+        fitingroup1 = (seed1radialsep<rprojboundary(memberintmag)).all() and (seed1lossep<vprojboundary(memberintmag)).all()
+        fitingroup2 = (seed2radialsep<rprojboundary(memberintmag)).all() and (seed2lossep<vprojboundary(memberintmag)).all()
         fitingroup = fitingroup1 and fitingroup2
     else:
         assert False, "Function argument `decisionmode` must be either `allgalaxies` or `centers`."
@@ -481,7 +480,7 @@ def HAMwrapper(galra, galdec, galcz, galmag, galgrpid, volume,  inputfilename=No
     if delinfile: os.remove(inputfilename)
     return haloid, halologmass, halorvir, halosigma
 
-def get_rproj_czdisp(galaxyra, galaxydec, galaxycz, galaxygrpid):
+def get_rproj_czdisp(galaxyra, galaxydec, galaxycz, galaxygrpid, H0=100.):
     """
     Compute the observational projected radius, in Mpc/h, and the observational
     velocity dispersion, in km/s, for a galaxy group catalog. Input should match
@@ -531,7 +530,7 @@ def get_rproj_czdisp(galaxyra, galaxydec, galaxycz, galaxygrpid):
             thetacen=grpdec[sel][0]
             cosDpsi=np.cos(thetacen)*np.cos(galaxydec[sel])+np.sin(thetacen)*np.sin(galaxydec[sel])*np.cos((phicen - galaxyra[sel]))
             sinDpsi=np.sqrt(1-cosDpsi**2)
-            rp=sinDpsi*galaxycz[sel]/HUBBLE_CONST
+            rp=sinDpsi*galaxycz[sel]/H0
             rproj[sel]=np.sqrt(np.sum(rp**2)/len(sel[0]))
             czcen = grpcz[sel][0]
             Dz2 = np.sum((galaxycz[sel]-czcen)**2.0)

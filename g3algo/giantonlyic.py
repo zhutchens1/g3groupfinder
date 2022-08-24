@@ -16,7 +16,7 @@ ipython = get_ipython()
 from smoothedbootstrap import smoothedbootstrap as sbs
 from scipy.optimize import curve_fit
 from scipy.stats import mode 
-import testingnewiterativecombination as ic
+import iterativecombination as ic
 def giantmodel(x, a, b):
     return np.abs(a)*np.log10(np.abs(b)*x+1)
 
@@ -196,8 +196,8 @@ def giants_fit_in_group(galra, galdec, galcz, galgrpid, rprojboundary, vprojboun
         seed2radialsep = (seed2grpcz[0]+allgrpcz[0])/100. * np.sin(fof.angular_separation(allgrpra[0],allgrpdec[0],seed2grpra[0],seed2grpdec[0])/2.)
         seed2lossep = np.abs(seed2grpcz[0]-allgrpcz[0])
         totalgrpN = len(seed1grpra)+len(seed2grpra)
-        fitingroup1 = (seed1radialsep<rproj_boundary(totalgrpN)).all() and (seed1lossep<vproj_boundary(totalgrpN)).all()
-        fitingroup2 = (seed2radialsep<rproj_boundary(totalgrpN)).all() and (seed2lossep<vproj_boundary(totalgrpN)).all()
+        fitingroup1 = (seed1radialsep<rprojboundary(totalgrpN)).all() and (seed1lossep<vprojboundary(totalgrpN)).all()
+        fitingroup2 = (seed2radialsep<rprojboundary(totalgrpN)).all() and (seed2lossep<vprojboundary(totalgrpN)).all()
         fitingroup = fitingroup1 and fitingroup2
     else:
         assert False, "Function argument `decisionmode` must be either `allgalaxies` or `centers`."
@@ -251,14 +251,6 @@ if __name__=='__main__':
         relvel = np.abs(ecogiantgrpcz - np.array(eco.cz))
         relprojdist = (ecogiantgrpcz + np.array(eco.cz))/100. * fof.angular_separation(ecogiantgrpra, ecogiantgrpdec, np.array(eco.radeg), np.array(eco.dedeg))/2.0
         giantgrpn = fof.multiplicity_function(itergiantfofid,return_by_galaxy=True)
-        print(min(giantgrpn),max(giantgrpn))
-        plt.figure()
-        plt.axhline(rproj_boundary(2))
-        plt.scatter(groupintmag, relprojdist, color='k', s=2)
-        plt.xlim(-24,-19)
-        #plt.ylim(0,0.8)
-        plt.gca().invert_xaxis()
-        plt.show()
 
     coma_id,_ = mode(giantfofid)
     print(coma_id) 
