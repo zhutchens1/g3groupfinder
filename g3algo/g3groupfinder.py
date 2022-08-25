@@ -10,6 +10,8 @@ from scipy.optimize import curve_fit
 from center_binned_stats import center_binned_stats
 from smoothedbootstrap import smoothedbootstrap as sbs
 from giantonlyic import iterative_combination_giants
+import altgroupcenter as agc
+
 def sigmarange(x):
     q84, q16 = np.percentile(x, [84 ,16])
     return (q84-q16)/2.
@@ -55,7 +57,9 @@ def g3groupfinder_luminosity(radeg,dedeg,cz,absrmag,dwarfgiantdivide,fof_bperp=0
     center_mode : str
         Specifies how group centers for giant-hosting groups should be computed when iteratively
         combining giant-only FoF groups, or associating dwarfs to giant-only groups. 
-        Can be 'average' or 'BCG'.
+        Can be 'average', 'giantaverage', 'BCG', or a two-element tuple. If a tuple, a group center
+        is calculated that smoothly varies between the average and BCG. The elements of the tuple
+        set the steepness and critical transition (in N_galaxies) of the sigmoid.
     iterative_giant_only_groups : bool 
         If False (default), giant-only groups are determined with a single run of FoF.
         If True, giant-only groups are determined iteratively, starting with FoF and refining
@@ -154,12 +158,15 @@ def g3groupfinder_luminosity(radeg,dedeg,cz,absrmag,dwarfgiantdivide,fof_bperp=0
 
     ### if values not passed, fit rproj and vproj vs. N_giants
     if (rproj_fit_params is None) or (vproj_fit_params is None):
-        if center_mode=='average':
+        if center_mode=='average' or center_mode=='giantaverage':
             giantgrpra, giantgrpdec, giantgrpcz = fof.group_skycoords(radeg[giantsel], dedeg[giantsel], cz[giantsel], giantfofid)
         elif center_mode=='BCG':
-            giantgrpra, giantgrpdec, giantgrpcz = fof.BCG_center(radeg[giantsel], dedeg[giantsel], cz[giantsel], absrmag[giantsel], giantfofid)
+            giantgrpra, giantgrpdec, giantgrpcz = agc.BCG_skycoords(radeg[giantsel], dedeg[giantsel], cz[giantsel], absrmag[giantsel], giantfofid)
+        elif (type(center_mode) is tuple):
+            assert len(center_mode)==2,"Logistic skycoord tuple requires two parameters."
+            giantgrpra, giantgrpdec, giantgrpcz = agc.logistic_skycoords(radeg[giantsel], dedeg[giantsel], cz[giantsel], absrmag[giantsel],\
+                 giantfofid,center_mode[0],center_mode[1])
         relvel = np.abs(giantgrpcz - cz[giantsel])
-        #relprojdist = (giantgrpcz + cz[giantsel])/H0 * np.sin(ic.angular_separation(giantgrpra, giantgrpdec, radeg[giantsel], dedeg[giantsel])/2.0)
         grp_ctd = cosmo.comoving_transverse_distance(giantgrpcz/SPEED_OF_LIGHT).value
         gia_ctd = cosmo.comoving_transverse_distance(cz[giantsel]/SPEED_OF_LIGHT).value
         relprojdist = (grp_ctd+gia_ctd)*np.sin(ic.angular_separation(giantgrpra, giantgrpdec, radeg[giantsel], dedeg[giantsel])/2.0)
@@ -198,10 +205,15 @@ def g3groupfinder_luminosity(radeg,dedeg,cz,absrmag,dwarfgiantdivide,fof_bperp=0
 
     ### associate dwarfs to giant-only groups
     dwarfsel = (absrmag>dwarfgiantdivide)
-    if center_mode=='average':
+    if center_mode=='average' or center_mode=='giantaverage':
         giantgrpra, giantgrpdec, giantgrpcz = fof.group_skycoords(radeg[giantsel], dedeg[giantsel], cz[giantsel], g3grpid[giantsel])
     elif center_mode=='BCG':
-        giantgrpra, giantgrpdec, giantgrpcz = fof.BCG_center(radeg[giantsel], dedeg[giantsel], cz[giantsel], absrmag[giantsel], g3grpid[giantsel])
+        giantgrpra, giantgrpdec, giantgrpcz = agc.BCG_skycoords(radeg[giantsel], dedeg[giantsel], cz[giantsel], absrmag[giantsel], g3grpid[giantsel])
+    elif (type(center_mode) is tuple):
+        assert len(center_mode)==2,"Logistic skycoord tuple requires two parameters."
+        giantgrpra, giantgrpdec, giantgrpcz = agc.logistic_skycoords(radeg[giantsel], dedeg[giantsel], cz[giantsel], absrmag[giantsel],\
+             giantfofid,center_mode[0],center_mode[1])
+
     giantgrpn = fof.multiplicity_function(g3grpid[giantsel],return_by_galaxy=True)
     dwarfassocid, _ = fof.fast_faint_assoc(radeg[dwarfsel],dedeg[dwarfsel],cz[dwarfsel],giantgrpra,giantgrpdec,giantgrpcz,g3grpid[giantsel],\
         rproj_boundary(giantgrpn),vproj_boundary(giantgrpn), H0=H0,Om0=Om0,Ode0=Ode0)
@@ -210,8 +222,9 @@ def g3groupfinder_luminosity(radeg,dedeg,cz,absrmag,dwarfgiantdivide,fof_bperp=0
     ### if values not passed, fit rproj and vproj for giants+dwarfs vs. Ltot
     if (gd_rproj_fit_params is None) or (gd_vproj_fit_params is None):
         gdgrpn = fof.multiplicity_function(g3grpid, return_by_galaxy=True)
-        gdsel = np.logical_not(np.logical_or(g3grpid==-99., ((gdgrpn==1) & (absrmag>dwarfgiantdivide)))) 
+        gdsel = np.logical_not(np.logical_or(g3grpid==-99., ((gdgrpn==1) & (absrmag>dwarfgiantdivide))))
         gdgrpra, gdgrpdec, gdgrpcz = fof.group_skycoords(radeg[gdsel], dedeg[gdsel], cz[gdsel], g3grpid[gdsel])
+            
         gdrelvel = np.abs(gdgrpcz - cz[gdsel])
         ctd1 = cosmo.comoving_transverse_distance(gdgrpcz/SPEED_OF_LIGHT).value
         ctd2 = cosmo.comoving_transverse_distance(cz[gdsel]/SPEED_OF_LIGHT).value

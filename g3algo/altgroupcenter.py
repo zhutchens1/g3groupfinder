@@ -9,7 +9,7 @@ from sklearn.neighbors import KernelDensity
 from scipy.stats import binned_statistic
 import foftools as fof
 
-def giantaverage(galaxyra, galaxydec, galaxycz, galaxymag, galaxygrpid, divider=-19.5)
+def giantaverage(galaxyra, galaxydec, galaxycz, galaxymag, galaxygrpid, divider=-19.5):
     """
     Compute average group centers using only giant galaxies.
     """
