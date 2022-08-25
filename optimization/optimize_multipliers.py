@@ -44,7 +44,7 @@ def get_score(radeg,dedeg,cz,absrmag,divide,truegroupID,trueloghalomass,ecovolum
     P_G, C_G = get_metrics_by_group(grpid, truegroupID, absrmag) 
     P_H, C_H = get_metrics_by_halo(grpid, truegroupID, absrmag) 
     score = 1 - (np.mean(P_G)*np.mean(C_G)*np.mean(P_H)*np.mean(C_H) - muHME)
-    print(muHME, (np.mean(P_G)*np.mean(C_G)*np.mean(P_H)*np.mean(C_H)))
+    print(muHME, np.mean(P_G),np.mean(C_G),np.mean(P_H),np.mean(C_H))
     return score
 
 if __name__=='__main__':
@@ -58,32 +58,34 @@ if __name__=='__main__':
     loghalom = mock.loghalom.to_numpy()
     def objective(mult):
         return get_score(radeg,dedeg,cz,absrmag,-19.5,haloid,loghalom,192351.,mult[0],mult[1],mult[2],mult[3])
-    
-    # do grid serch
-    ncandidates=10
-    #rproj_fit__candid = np.random.uniform(0,10,ncandidates)#np.array([2,5,8])
-    #vproj_fit__candid = np.random.uniform(0,10,ncandidates)#np.array([2,5,8])
-    #gd_rproj_fit__candid = np.random.uniform(0,10,ncandidates)#np.array([2,5,8])
-    #gd_vproj_fit__candid = np.random.uniform(0,10,ncandidates)#np.array([2,5,8])
-    #candid = np.array([rproj_fit__candid,vproj_fit__candid,gd_rproj_fit__candid,gd_vproj_fit__candid]).T
-    rproj_fit__candid = [2, 2.5, 3, 3.5, 4.]#[1,3,5,7]
-    vproj_fit__candid =  [6, 6.5, 7, 7.5, 8., 9.]#[1,3,5,7]
-    gd_rproj_fit__candid =  [0.5, 1, 1.5, 2]#[1,3,5,7]
-    gd_vproj_fit__candid = [4, 4.5, 5, 5.5, 6]#[1,3,5,7]
-    candid=[]
-    for R1 in rproj_fit__candid:
-        for V1 in vproj_fit__candid:
-            for R2 in gd_rproj_fit__candid:
-                for V2 in gd_vproj_fit__candid:
-                    candid.append((R1,V1,R2,V2))
-    candid=np.array(candid)
+   
+    print(objective([3,7,1,4]))
+    if False: 
+        # do grid serch
+        ncandidates=10
+        #rproj_fit__candid = np.random.uniform(0,10,ncandidates)#np.array([2,5,8])
+        #vproj_fit__candid = np.random.uniform(0,10,ncandidates)#np.array([2,5,8])
+        #gd_rproj_fit__candid = np.random.uniform(0,10,ncandidates)#np.array([2,5,8])
+        #gd_vproj_fit__candid = np.random.uniform(0,10,ncandidates)#np.array([2,5,8])
+        #candid = np.array([rproj_fit__candid,vproj_fit__candid,gd_rproj_fit__candid,gd_vproj_fit__candid]).T
+        rproj_fit__candid = [2, 2.5, 3, 3.5, 4.]#[1,3,5,7]
+        vproj_fit__candid =  [6, 6.5, 7, 7.5, 8., 9.]#[1,3,5,7]
+        gd_rproj_fit__candid =  [0.5, 1, 1.5, 2]#[1,3,5,7]
+        gd_vproj_fit__candid = [4, 4.5, 5, 5.5, 6]#[1,3,5,7]
+        candid=[]
+        for R1 in rproj_fit__candid:
+            for V1 in vproj_fit__candid:
+                for R2 in gd_rproj_fit__candid:
+                    for V2 in gd_vproj_fit__candid:
+                        candid.append((R1,V1,R2,V2))
+        candid=np.array(candid)
 
-    print(candid)
-    import time
-    ti = time.time()
-    scores = fast_grid_search(candid,objective)
-    print("best score from grid search", np.min(scores))
-    bestgridmult = candid[np.argmin(scores)]
-    print('best mult from grid search', bestgridmult) 
-    print('done in {} seconds'.format(time.time()-ti))
+        print(candid)
+        import time
+        ti = time.time()
+        scores = fast_grid_search(candid,objective)
+        print("best score from grid search", np.min(scores))
+        bestgridmult = candid[np.argmin(scores)]
+        print('best mult from grid search', bestgridmult) 
+        print('done in {} seconds'.format(time.time()-ti))
   
