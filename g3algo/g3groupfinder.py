@@ -16,8 +16,8 @@ def sigmarange(x):
     q84, q16 = np.percentile(x, [84 ,16])
     return (q84-q16)/2.
 
-def giantmodel(x, a, b):
-    return np.abs(a)*np.log10(np.abs(b)*x+1)
+def giantmodel(x, a, b, c):
+    return np.abs(a)*np.log10(np.abs(b)*x+1)+c
 
 def decayexp(x, a, b):
     return np.abs(a)*np.exp(-1*np.abs(b)*x)#+np.abs(d)

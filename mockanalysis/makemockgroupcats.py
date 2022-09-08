@@ -3,6 +3,7 @@ import numpy as np
 import sys
 sys.path.insert(0,'../g3algo/')
 from g3groupfinder import g3groupfinder_luminosity as g3gf
+from splitfalsepairs import split_false_pairs 
 import foftools as fof
 import iterativecombination as ic
 from group_purity import get_metrics_by_group, get_metrics_by_halo
@@ -20,7 +21,7 @@ def weighted_percentile(data, weights, perc):
 
 def make_mock_group_cat(filename):
     mock = pd.read_hdf(filename)
-    mock = mock[mock.M_r < -19.5]
+    mock = mock[mock.M_r < -17.33]
     radeg = mock.ra.to_numpy()
     dedeg = mock.dec.to_numpy()
     cz = mock.cz.to_numpy()
@@ -49,6 +50,28 @@ def make_mock_group_cat(filename):
     mock.loc[:,'group_comp']=C_G
     mock.loc[:,'halo_purity']=P_H
     mock.loc[:,'halo_comp']=C_H
+
+    # make mock FoF cat.
+    fofe17id = fof.fast_fof(radeg,dedeg,cz,0.07,1.1,(ecovolume/len(radeg))**(1/3.))
+    fofe17id = split_false_pairs(radeg,dedeg,cz,fofe17id)
+    fofe17grpn = fof.multiplicity_function(fofe17id,return_by_galaxy=True)
+    haloid, halomass, _, _ = ic.HAMwrapper(radeg,dedeg,cz,absrmag,fofe17id,ecovolume)
+    foflogmh = np.zeros_like(fofe17id)
+    for i,idv in enumerate(haloid):
+        sel = np.where(fofe17id==idv)
+        foflogmh[sel] = halomass[i] # m337b
+
+    P_G,C_G = get_metrics_by_group(fofe17id, mock.haloid.to_numpy(), absrmag)
+    P_H,C_H = get_metrics_by_halo(fofe17id, mock.haloid.to_numpy(), absrmag)
+
+    mock['fofe17id']=fofe17id
+    mock['fofe17grpn']=fofe17grpn
+    mock['fofe17logmh']=foflogmh
+    mock['fofe17purity_g']=P_G
+    mock['fofe17completeness_g']=C_G
+    mock['fofe17purity_h']=P_H
+    mock['fofe17completeness_h']=C_H
+
     x = filename.split('/')
     outfile=x[0]+'/halobiasgroupcats/'+x[2]+'/'+x[3][:-5]+".csv"
     mock.to_csv(outfile)
