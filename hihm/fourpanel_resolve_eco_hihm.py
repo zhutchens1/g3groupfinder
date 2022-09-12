@@ -97,4 +97,5 @@ if __name__=='__main__':
     make_panel(ax1,xvalue,yvalue,binvalues,xlimits,ylimits,r"log group $M_{\rm vir}$",None,'mediumorchid','purple',0.9)
     ax1.annotate("RESOLVE: FoF Groups", xy=(annopos[0],annopos[1]-0.2), color='purple')
     plt.tight_layout()
+    plt.savefig("../figures/HIHM.pdf", dpi=300)
     plt.show()
