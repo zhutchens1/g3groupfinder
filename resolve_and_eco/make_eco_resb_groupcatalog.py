@@ -9,18 +9,21 @@ matplotlib.use('TkAgg')
 import matplotlib.pyplot as plt
 import pandas as pd
 from scipy.interpolate import interp1d
+from lss_dens import lss_dens_by_galaxy
+import virtools as vz
 
 if __name__=='__main__':
     hubble_const = 70.
     ecovolume = 191958.08 / (hubble_const/100.)**3.
-    gfargseco = dict({'volume':ecovolume,'rproj_fit_multiplier':2.5,'vproj_fit_multiplier':7,\
-           'gd_rproj_fit_multiplier':3., 'gd_vproj_fit_multiplier':2.5, 'gd_fit_bins':np.arange(-24,-19,0.25), 'gd_rproj_fit_guess':[1e-5, 0.4], 'gd_vproj_fit_guess':[3e-5,4e-1], 'H0':hubble_const,\
-            'iterative_giant_only_groups':True, 'ic_decision_mode':'centers'})
+    gfargseco = dict({'volume':ecovolume,'rproj_fit_multiplier':2.5,'vproj_fit_multiplier':3.5,'vproj_fit_offset':200,\
+           'gd_rproj_fit_multiplier':1.5, 'gd_vproj_fit_multiplier':3.5, 'gd_fit_bins':np.arange(-24,-19,0.25), 'gd_rproj_fit_guess':[1e-5, 0.4],\
+           'gd_vproj_fit_guess':[3e-5,4e-1], 'H0':hubble_const, 'iterative_giant_only_groups':True, 'ic_decision_mode':'centers'})
     ########################
     # Group Finding: ECO
     ########################
     eco = pd.read_csv('ECOdata_080822.csv')
     ecogroupsel = (eco.absrmag<-17.33)
+    eco.loc[:,'logmbary'] = np.log10(10**eco.logmstar+10**eco.logmgas)
     ecog3grpid = np.zeros(len(eco))-99.
     output = g3gf(eco[ecogroupsel].radeg,eco[ecogroupsel].dedeg,eco[ecogroupsel].cz,eco[ecogroupsel].absrmag,-19.5,**gfargseco)
     
@@ -40,11 +43,17 @@ if __name__=='__main__':
 
     eco.loc[:,'g3logmh_l'] = ecog3logmh
     eco.loc[:,'g3grplogG_l'] = ic.get_int_mass(eco.logmgas.to_numpy(),eco.g3grp_l.to_numpy())
+    eco.loc[:,'g3grplogS_l'] = ic.get_int_mass(eco.logmstar.to_numpy(),eco.g3grp_l.to_numpy())
+    eco.loc[:,'g3grplogB_l'] = ic.get_int_mass(eco.logmbary.to_numpy(),eco.g3grp_l.to_numpy())
+    eco.loc[:,'g3grpmhi_l'] = np.log10(10**eco.g3grplogG_l / 1.4)
     ecogrpradeg,ecogrpdedeg,ecogrpcz = fof.group_skycoords(eco.radeg.to_numpy(),eco.dedeg.to_numpy(),eco.cz.to_numpy(),eco.g3grp_l.to_numpy())
     eco.loc[:,'g3grpradeg_l'] = ecogrpradeg
     eco.loc[:,'g3grpdedeg_l'] = ecogrpdedeg
     eco.loc[:,'g3grpcz_l'] = ecogrpcz
     eco.loc[:,'g3fc_l'] = fof.get_central_flag(eco.absrmag.to_numpy(), eco.g3grp_l.to_numpy())
+    eco.loc[:,'g3satmhi_l'] = fof.get_satint_mass(np.log10(10**eco.logmgas.to_numpy()/1.4), eco.g3grp_l.to_numpy(), eco.g3fc_l.to_numpy())
+    eco.loc[:,'g3cenmhi_l'] = fof.get_central_mass(np.log10(10**eco.logmgas.to_numpy()/1.4), eco.g3grp_l.to_numpy(), eco.g3fc_l.to_numpy())
+    print('here: ', np.sum(eco.g3satmhi_l))
     ecog3grpngi=np.zeros_like(ecogrpradeg)
     ecog3grpndw=np.zeros_like(ecogrpradeg)
     for uid in np.unique(ecog3grpid):
@@ -57,9 +66,22 @@ if __name__=='__main__':
             ecog3grpndw[grpsel]=len(dwsel[0])
     eco.loc[:,'g3grpngi_l']=ecog3grpngi
     eco.loc[:,'g3grpndw_l']=ecog3grpndw
+    densoutput = lss_dens_by_galaxy(eco.g3grp_l.to_numpy(),eco.radeg.to_numpy(), eco.dedeg.to_numpy(), eco.cz.to_numpy(), eco.g3logmh_l.to_numpy(),\
+         Nnn=3, rarange=(130.05,237.45), decrange=(-1,50), czrange=(2530,7470))
+    eco.loc[:,'g3grpnndens_l']=densoutput[0]
+    eco.loc[:,'g3grpedgeflag_l']=densoutput[1]
+    eco.loc[:,'g3grpnndens2d_l']=densoutput[2]
+    eco.loc[:,'g3grpedgeflag2d_l']=densoutput[3]
+    eco.loc[:,'g3grpedgescale2d_l']=densoutput[4]
+    eco.loc[:,'g3grptcross_l']=vz.group_crossing_time(eco.radeg.to_numpy(), eco.dedeg.to_numpy(), eco.cz.to_numpy(),eco.g3grp_l.to_numpy(),H0=hubble_const)
 
     nansel = (eco.g3grp_l<0)
     eco.loc[nansel,'g3grplogG_l']=-99.
+    eco.loc[nansel,'g3grplogS_l']=-99.
+    eco.loc[nansel,'g3grplogB_l']=-99.
+    eco.loc[nansel,'g3grpmhi_l']=-99.
+    eco.loc[nansel,'g3satmhi_l']=-99.
+    eco.loc[nansel,'g3cenmhi_l']=-99.
     eco.loc[nansel,'g3logmh_l']=-99.
     eco.loc[nansel,'g3grpradeg_l']=-99.
     eco.loc[nansel,'g3grpdedeg_l']=-99.
@@ -67,11 +89,18 @@ if __name__=='__main__':
     eco.loc[nansel,'g3fc_l']=-99.
     eco.loc[nansel,'g3grpngi_l']=-99.
     eco.loc[nansel,'g3grpndw_l']=-99.
+    eco.loc[nansel,'g3grpnndens_l']=-99.
+    eco.loc[nansel,'g3grpedgeflag_l']=-99.
+    eco.loc[nansel,'g3grpnndens2d_l']=-99.
+    eco.loc[nansel,'g3grpedgeflag2d_l']=-99.
+    eco.loc[nansel,'g3grpedgescale2d_l']=-99.
+    eco.loc[nansel,'g3grptcross_l']=-99.
     eco.to_csv("ECOdata_G3catalog_luminosity.csv",index=False)
     ##########################
     # Group Finding: RESOLVE
     ##########################
     resolve = pd.read_csv('RESOLVEdata_080822.csv')
+    resolve.loc[:,'logmbary']=np.log10(10**resolve.logmstar+10**resolve.logmgas)
     resolveg3grpid=np.zeros(len(resolve))-99.
     resolveg3logmh=np.zeros(len(resolve))-99.
     # RESOLVE-B analogue group finding + HAM
@@ -99,8 +128,8 @@ if __name__=='__main__':
     resbgroupsel = (resolve.fl_insample==1.)&(resolve.f_b==1)
     tmpid = g3gf(resolve[resbgroupsel].radeg, resolve[resbgroupsel].dedeg, resolve[resbgroupsel].cz, resolve[resbgroupsel].absrmag, -19.5, fof_sep=resbana_fofsep,\
          rproj_fit_params=resbana_rproj_fit_params,vproj_fit_params=resbana_vproj_fit_params, gd_rproj_fit_params = resbana_gd_rproj_fit_params,\
-         gd_vproj_fit_params = resbana_gd_vproj_fit_params, rproj_fit_multiplier=2.5,vproj_fit_multiplier = 7, gd_rproj_fit_multiplier=3., gd_vproj_fit_multiplier=2.5, H0=hubble_const,\
-         iterative_giant_only_groups=True)[0]
+         gd_vproj_fit_params = resbana_gd_vproj_fit_params, rproj_fit_multiplier=2.5,vproj_fit_multiplier = 3.5, vproj_fit_offset=200, gd_rproj_fit_multiplier=1.5, gd_vproj_fit_multiplier=3.5,\
+         H0=hubble_const, iterative_giant_only_groups=True)[0]
 
     resolveg3grpid[resbgroupsel] = tmpid
     resolveg3logmh[resbgroupsel] = mhspline(ic.get_int_mag(resolve[resbgroupsel].absrmag.to_numpy(), tmpid))
@@ -108,11 +137,21 @@ if __name__=='__main__':
     resolveg3grpdedeg=np.zeros_like(resolveg3grpid)
     resolveg3grpcz=np.zeros_like(resolveg3grpid)
     resolveg3grplogG_l = np.zeros_like(resolveg3grpid)
+    resolveg3grplogS_l = np.zeros_like(resolveg3grpid)
+    resolveg3grplogB_l = np.zeros_like(resolveg3grpid)
     resolveg3fc = np.zeros_like(resolveg3grpid)
     resolveg3grplogG_l[resbgroupsel] = ic.get_int_mass(resolve[resbgroupsel].logmgas.to_numpy(), tmpid)
+    resolveg3grplogS_l[resbgroupsel] = ic.get_int_mass(resolve[resbgroupsel].logmstar.to_numpy(), tmpid)
+    resolveg3grplogB_l[resbgroupsel] = ic.get_int_mass(resolve[resbgroupsel].logmbary.to_numpy(), tmpid)
     resolveg3grpradeg[resbgroupsel],resolveg3grpdedeg[resbgroupsel],resolveg3grpcz[resbgroupsel]=fof.group_skycoords(resolve[resbgroupsel].radeg.to_numpy(),\
         resolve[resbgroupsel].dedeg.to_numpy(), resolve[resbgroupsel].cz.to_numpy(), tmpid)
     resolveg3fc[resbgroupsel] = fof.get_central_flag(resolve[resbgroupsel].absrmag.to_numpy(), tmpid)
+
+    resolveg3satmhi=np.zeros_like(resolveg3grpid)
+    resolveg3cenmhi=np.zeros_like(resolveg3grpid)
+    resolveg3cenmhi[resbgroupsel] = fof.get_central_mass(np.log10(10**resolve[resbgroupsel].logmgas.to_numpy()/1.4), tmpid, resolveg3fc[resbgroupsel])
+    resolveg3satmhi[resbgroupsel] = fof.get_satint_mass(np.log10(10**resolve[resbgroupsel].logmgas.to_numpy()/1.4), tmpid, resolveg3fc[resbgroupsel])
+
     resolveg3grpngi = np.zeros_like(resolveg3grpid)
     resolveg3grpndw = np.zeros_like(resolveg3grpid)
     resbg3grpngi = np.zeros_like(tmpid)
@@ -127,6 +166,26 @@ if __name__=='__main__':
             resbg3grpndw[grpsel]=len(dwsel[0])
     resolveg3grpngi[resbgroupsel]=resbg3grpngi
     resolveg3grpndw[resbgroupsel]=resbg3grpndw
+
+    resolveg3nndens=np.zeros_like(resolveg3grpid)
+    resolveg3edgeflag=np.zeros_like(resolveg3grpid)
+    resolveg3nndens2d=np.zeros_like(resolveg3grpid)
+    resolveg3edgeflag2d=np.zeros_like(resolveg3grpid)
+    resolveg3edgescale2d=np.zeros_like(resolveg3grpid)
+    RESB_RADEG_REMAPPED = np.copy(resolve[resbgroupsel].radeg.to_numpy())
+    REMAPSEL = np.where(RESB_RADEG_REMAPPED>18*15.)
+    RESB_RADEG_REMAPPED[REMAPSEL] = RESB_RADEG_REMAPPED[REMAPSEL]-360.
+    densoutput = lss_dens_by_galaxy(tmpid, RESB_RADEG_REMAPPED, resolve[resbgroupsel].dedeg.to_numpy(), resolve[resbgroupsel].cz.to_numpy(), resolveg3logmh[resbgroupsel],\
+        Nnn=3, rarange=(-2*15.,3*15.), decrange=(-1.25,1.25), czrange=(4250,7250))
+    resolveg3nndens[resbgroupsel]=densoutput[0] 
+    resolveg3edgeflag[resbgroupsel]=densoutput[1] 
+    resolveg3nndens2d[resbgroupsel]=densoutput[2] 
+    resolveg3edgeflag2d[resbgroupsel]=densoutput[3] 
+    resolveg3edgescale2d[resbgroupsel]=densoutput[4] 
+    resolveg3grptcross=np.zeros_like(resolveg3grpid)
+    resolveg3grptcross[resbgroupsel]=vz.group_crossing_time(resolve[resbgroupsel].radeg.to_numpy(), resolve[resbgroupsel].dedeg.to_numpy(), resolve[resbgroupsel].cz.to_numpy(),\
+        tmpid, H0=hubble_const)    
+
     # get RESOLVE-A from ECO
     resolvename = resolve.name.to_numpy()
     resname_in_eco = eco.resname.to_numpy()
@@ -140,17 +199,38 @@ if __name__=='__main__':
             resolveg3grpdedeg[ii]=eco.g3grpdedeg_l[ecosel]
             resolveg3grpcz[ii]=eco.g3grpcz_l[ecosel]
             resolveg3grplogG_l[ii]=eco.g3grplogG_l[ecosel]
+            resolveg3grplogS_l[ii]=eco.g3grplogS_l[ecosel]
+            resolveg3grplogB_l[ii]=eco.g3grplogB_l[ecosel]
             resolveg3fc[ii]=eco.g3fc_l[ecosel]
             resolveg3grpngi[ii]=eco.g3grpngi_l[ecosel]
             resolveg3grpndw[ii]=eco.g3grpndw_l[ecosel]
-
+            resolveg3nndens[ii]=eco.g3grpnndens_l[ecosel]
+            resolveg3edgeflag[ii]=eco.g3grpedgeflag_l[ecosel]
+            resolveg3nndens2d[ii]=eco.g3grpnndens2d_l[ecosel]
+            resolveg3edgeflag2d[ii]=eco.g3grpedgeflag2d_l[ecosel]
+            resolveg3edgescale2d[ii]=eco.g3grpedgescale2d_l[ecosel]
+            resolveg3grptcross[ii]=eco.g3grptcross_l[ecosel]
+            resolveg3cenmhi[ii]=eco.g3cenmhi_l[ecosel]
+            resolveg3satmhi[ii]=eco.g3satmhi_l[ecosel]
     resolve.loc[:,'g3grp_l']=resolveg3grpid
     resolve.loc[:,'g3logmh_l']=resolveg3logmh
     resolve.loc[:,'g3grplogG_l']=resolveg3grplogG_l
+    resolve.loc[:,'g3grplogS_l']=resolveg3grplogS_l
+    resolve.loc[:,'g3grplogB_l']=resolveg3grplogB_l
+    resolve.loc[:,'g3grpmhi_l']=np.log10(10**resolveg3grplogG_l/1.4)
+    resolve.loc[(resolve.g3grp_l==-99.),'g3grpmhi_l']=-99.
+    resolve.loc[:,'g3cenmhi']=resolveg3cenmhi
+    resolve.loc[:,'g3satmhi']=resolveg3satmhi
     resolve.loc[:,'g3grpradeg_l']=resolveg3grpradeg
     resolve.loc[:,'g3grpdedeg_l']=resolveg3grpdedeg
     resolve.loc[:,'g3grpcz_l']=resolveg3grpcz
     resolve.loc[:,'g3fc_l']=resolveg3fc
     resolve.loc[:,'g3grpngi_l']=resolveg3grpngi
     resolve.loc[:,'g3grpndw_l']=resolveg3grpndw
+    resolve.loc[:,'g3grpnndens_l']=resolveg3nndens
+    resolve.loc[:,'g3grpedgeflag_l']=resolveg3edgeflag
+    resolve.loc[:,'g3grpnndens2d_l']=resolveg3nndens2d
+    resolve.loc[:,'g3grpedgeflag2d_l']=resolveg3edgeflag2d
+    resolve.loc[:,'g3grpedgescale2d_l']=resolveg3edgescale2d
+    resolve.loc[:,'g3grptcross_l']=resolveg3grptcross
     resolve.to_csv("RESOLVEdata_G3catalog_luminosity.csv")
