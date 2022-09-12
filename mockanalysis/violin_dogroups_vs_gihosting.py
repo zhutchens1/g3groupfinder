@@ -69,8 +69,8 @@ if __name__=='__main__':
         ax1.annotate(r"$p=$"+"{:0.1E}".format(pvals[ii]), (xpos-db/2.5,-0.02))
     print(pvals)
     ax1.set_xlim(11-np.log10(H0/100.),12-np.log10(H0/100.))
-    ax1.set_xlabel(r"$\log M_{\rm vir}$")
-    ax1.set_ylabel(r"$R_{\rm proj,\, gal}$")
+    ax1.set_xlabel(r"$\log M_{\rm vir}$ [$\rm M_\odot$]")
+    ax1.set_ylabel(r"$R_{\rm proj,\, gal}$ [Mpc]")
     labels=['Giant-Hosting Halo Galaxies', 'Dwarf-Only Halo Galaxies']
     fake_handles = [mpatches.Patch(color='lightgreen'), mpatches.Patch(color='lightcoral')]
     ax1.legend(fake_handles,labels,loc='upper left',framealpha=0)

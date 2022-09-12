@@ -27,8 +27,8 @@ def make_mock_group_cat(filename):
     cz = mock.cz.to_numpy()
     absrmag = mock.M_r.to_numpy()
     ecovolume = 192351.
-    gfparams = dict({'volume':ecovolume,'rproj_fit_multiplier':2.5,'vproj_fit_multiplier':7,\
-       'gd_rproj_fit_multiplier':3, 'gd_vproj_fit_multiplier':2.5,\
+    gfparams = dict({'volume':ecovolume,'rproj_fit_multiplier':2.5,'vproj_fit_multiplier':3.5,\
+       'vproj_fit_offset':200,'gd_rproj_fit_multiplier':1.5, 'gd_vproj_fit_multiplier':3.5,\
        'gd_fit_bins':np.arange(-24,-19,0.25),\
        'gd_rproj_fit_guess':[1e-5, 0.4], 'gd_vproj_fit_guess':[3e-5,4e-1], 'H0':100.,\
        'iterative_giant_only_groups':True, 'ic_decision_mode':'centers','center_mode':'average'})
@@ -89,6 +89,6 @@ if __name__=='__main__':
     from multiprocessing import Pool
     import time
     ti = time.time()
-    pool = Pool(20)
+    pool = Pool(30)
     _=pool.map(make_mock_group_cat, files_to_read)
     print('done in ', time.time()-ti, ' seconds.')
