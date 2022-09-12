@@ -47,9 +47,9 @@ def fast_grid_search(multsets,objective_fn):
     return results
 
 def get_score(radeg,dedeg,cz,absrmag,divide,truegroupID,trueloghalomass,ecovolume,rproj_fit_multiplier,\
-              vproj_fit_multiplier, gd_rproj_fit_multiplier, gd_vproj_fit_multiplier):
+              vproj_fit_multiplier, vproj_fit_offset, gd_rproj_fit_multiplier, gd_vproj_fit_multiplier):
     gfparams = dict({'volume':ecovolume,'rproj_fit_multiplier':rproj_fit_multiplier,'vproj_fit_multiplier':vproj_fit_multiplier,\
-           'gd_rproj_fit_multiplier':rproj_fit_multiplier, 'gd_vproj_fit_multiplier':gd_vproj_fit_multiplier,\
+           'vproj_fit_offset':vproj_fit_offset, 'gd_rproj_fit_multiplier':rproj_fit_multiplier, 'gd_vproj_fit_multiplier':gd_vproj_fit_multiplier,\
            'gd_fit_bins':np.arange(-24,-19,0.25),\
            'gd_rproj_fit_guess':[1e-5, 0.4], 'gd_vproj_fit_guess':[3e-5,4e-1], 'H0':100.,\
            'iterative_giant_only_groups':True, 'ic_decision_mode':'centers'})
@@ -79,26 +79,27 @@ if __name__=='__main__':
     haloid = mock.haloid.to_numpy()
     loghalom = mock.loghalom.to_numpy()
     def objective(mult):
-        return get_score(radeg,dedeg,cz,absrmag,-19.5,haloid,loghalom,192351.,mult[0],mult[1],mult[2],mult[3])
+        return get_score(radeg,dedeg,cz,absrmag,-19.5,haloid,loghalom,192351.,mult[0],mult[1],mult[2],mult[3],mult[4])
    
     if False: 
         # do grid serch
-        ncandidates=10
         #rproj_fit__candid = np.random.uniform(0,10,ncandidates)#np.array([2,5,8])
         #vproj_fit__candid = np.random.uniform(0,10,ncandidates)#np.array([2,5,8])
         #gd_rproj_fit__candid = np.random.uniform(0,10,ncandidates)#np.array([2,5,8])
         #gd_vproj_fit__candid = np.random.uniform(0,10,ncandidates)#np.array([2,5,8])
         #candid = np.array([rproj_fit__candid,vproj_fit__candid,gd_rproj_fit__candid,gd_vproj_fit__candid]).T
-        rproj_fit__candid = [1,2,3]#[2.5]#[1,3,5,7]
-        vproj_fit__candid =  [4,5,6,7]#[7.]#[1,3,5,7]
-        gd_rproj_fit__candid =  [1,2,3]#[1,2,3]#[1,3,5,7]
-        gd_vproj_fit__candid = [1,2,3]#[2.5,4,4.5]#[1,3,5,7]
+        rproj_fit__candid = [1,1.5,2]#[1,3,5,7]
+        vproj_fit__candid =  [2,2.5,3,3.5,4]#[1,3,5,7]
+        vproj_off__candid = [400]#
+        gd_rproj_fit__candid =  [1,1.5,2]
+        gd_vproj_fit__candid = [1,1.5,2]
         candid=[]
         for R1 in rproj_fit__candid:
             for V1 in vproj_fit__candid:
-                for R2 in gd_rproj_fit__candid:
-                    for V2 in gd_vproj_fit__candid:
-                        candid.append((R1,V1,R2,V2))
+                for Voff in vproj_off__candid:
+                    for R2 in gd_rproj_fit__candid:
+                        for V2 in gd_vproj_fit__candid:
+                            candid.append((R1,V1,Voff,R2,V2))
         candid=np.array(candid)
 
         print(candid)
@@ -109,5 +110,6 @@ if __name__=='__main__':
         bestgridmult = candid[np.argmin(scores)]
         print('best mult from grid search', bestgridmult) 
         print('done in {} seconds'.format(time.time()-ti))
-    print(objective((1,7,1,1)))
-    print(objective((2.5,7,3,2.5))) 
+    print(objective([  1.5,   3.,  400.,    1.  ,  1. ]))
+    print(objective([2.5,3.5,200,1.5,3.5]))
+    #print(objective((2.5,7,3,2.5))) 
