@@ -75,7 +75,7 @@ if __name__=='__main__':
     resg3 = resg3[resg3.g3fc_l>0] 
     yvalue = resg3.g3grpmhi_l.to_numpy()
     xvalue = resg3.g3logmh_l.to_numpy()
-    make_panel(ax,xvalue,yvalue,binvalues,xlimits,ylimits,r"log group $M_{\rm vir}$",r"log group-integrated HI mass [$\log M_{\odot}$]",'mediumorchid','purple',0.9)
+    make_panel(ax,xvalue,yvalue,binvalues,xlimits,ylimits,r"log group $M_{\rm vir}$ [$\rm M_\odot$]",r"log group-integrated HI mass [$\rm M_{\odot}$]",'mediumorchid','purple',0.9)
     ax.annotate("RESOLVE: G3 Groups", xy=(annopos[0],annopos[1]-0.2), color='purple') 
 
     ##########################
@@ -94,7 +94,7 @@ if __name__=='__main__':
     resfof = resfof[(resfof.fl_insample==1)&(resfof.grpcz>4500)&(resfof.grpcz<7000)]
     xvalue = resfof.logmhvir.to_numpy()
     yvalue = resfof.logmhigrp.to_numpy()
-    make_panel(ax1,xvalue,yvalue,binvalues,xlimits,ylimits,r"log group $M_{\rm vir}$",None,'mediumorchid','purple',0.9)
+    make_panel(ax1,xvalue,yvalue,binvalues,xlimits,ylimits,r"log group $M_{\rm vir}$ [$\rm M_\odot$]",None,'mediumorchid','purple',0.9)
     ax1.annotate("RESOLVE: FoF Groups", xy=(annopos[0],annopos[1]-0.2), color='purple')
     plt.tight_layout()
     plt.savefig("../figures/HIHM.pdf", dpi=300)

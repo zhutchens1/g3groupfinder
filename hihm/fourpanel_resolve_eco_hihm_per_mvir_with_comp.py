@@ -66,7 +66,7 @@ if __name__=='__main__':
     yvalue = np.log10(10**resg3.g3grpmhi_l.to_numpy()/10**xvalue)
     make_panel(ax,xvalue,yvalue,binvalues,xlimits,ylimits,xlab=None,ylab=r"log group-integrated mass fraction",ptcolor='mediumorchid',linecolor='purple',ptalpha=0.9,linelabel=r'$M_{\rm HI,\, grp}/M_{\rm vir}$ (RESOLVE)')
     ax.legend(loc='lower left',ncol=1, fontsize=8.5, framealpha=1)
-    ax.set_xlabel(r"$\log M_{\rm vir}$")
+    ax.set_xlabel(r"$\log M_{\rm vir}$ [$\rm M_\odot$]")
     ax.annotate("G3",xy=annopos,fontsize=16)
 
     ##########################
@@ -89,7 +89,7 @@ if __name__=='__main__':
     yvalue = np.log10(10**resfof.logmhigrp.to_numpy()/10**xvalue)
     make_panel(ax1,xvalue,yvalue,binvalues,xlimits,ylimits,xlab=None,ylab=None,ptcolor='mediumorchid',linecolor='purple',ptalpha=0.9,linelabel=r'$M_{\rm HI,\, grp}/M_{\rm vir}$ (RESOLVE)')
     ax1.legend(loc='lower left',ncol=1, fontsize=8.5, framealpha=1)
-    ax1.set_xlabel(r"$\log M_{\rm vir}$")
+    ax1.set_xlabel(r"$\log M_{\rm vir}$ [$\rm M_\odot$]")
     ax1.annotate("FoF",xy=annopos,fontsize=16)
     plt.tight_layout()
     plt.savefig("../figures/MHI_over_Mvir.pdf",dpi=300)
