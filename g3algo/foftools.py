@@ -638,7 +638,6 @@ def get_central_flag(galquantity, galgrpid):
         cflag[satsel]=0.
     return cflag
 
-
 def get_outermost_galradius(galra, galdec, galcz, galgrpid):
     """
     Get the radius, in arcseconds, to the outermost gruop galaxy.
@@ -804,3 +803,22 @@ def dynmass(galra,galdec,galcz,galgrpid,Aval=9.9,h=0.7):
     mdyn[np.where(mdyn<=0)]=1.
     return np.log10(mdyn)
 
+def get_central_mass(loggalmass, galgrpid, fc):
+    centralmass=np.zeros_like(loggalmass)
+    for uid in np.unique(galgrpid):
+        if uid<0:
+            pass
+        else:
+            grpsel = np.where(galgrpid==uid)
+            censel = np.where((galgrpid==uid) & (fc>0))
+            centralmass[grpsel] = float(loggalmass[censel[0]])
+    return centralmass
+
+def get_satint_mass(loggalmass, galgrpid, fc):
+    satintmass = np.zeros_like(loggalmass)
+    for uid in np.unique(galgrpid):
+        grpsel = np.where(galgrpid==uid)
+        satsel = np.where((galgrpid==uid)&(fc<1))
+        print(grpsel, satsel)
+        satintmass[grpsel] = np.log10(np.sum(10**loggalmass[satsel]))
+    return satintmass

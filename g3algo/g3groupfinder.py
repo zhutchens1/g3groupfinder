@@ -16,15 +16,15 @@ def sigmarange(x):
     q84, q16 = np.percentile(x, [84 ,16])
     return (q84-q16)/2.
 
-def giantmodel(x, a, b, c):
-    return np.abs(a)*np.log10(np.abs(b)*x+1)+c
+def giantmodel(x, a, b):
+    return np.abs(a)*np.log10(np.abs(b)*x+1)
 
 def decayexp(x, a, b):
     return np.abs(a)*np.exp(-1*np.abs(b)*x)#+np.abs(d)
 
 def g3groupfinder_luminosity(radeg,dedeg,cz,absrmag,dwarfgiantdivide,fof_bperp=0.07,fof_blos=1.1,fof_sep=None, volume=None, center_mode='average',\
                  iterative_giant_only_groups=False, n_bootstraps=10000, rproj_fit_guess=None, rproj_fit_params = None, rproj_fit_multiplier=None,\
-                 vproj_fit_guess = None, vproj_fit_params = None, vproj_fit_multiplier=None, gd_rproj_fit_guess=None, gd_rproj_fit_params = None,\
+                 vproj_fit_guess = None, vproj_fit_params = None, vproj_fit_multiplier=None, vproj_fit_offset=0, gd_rproj_fit_guess=None, gd_rproj_fit_params = None,\
                  gd_rproj_fit_multiplier=None, gd_vproj_fit_guess=None, gd_vproj_fit_params = None, gd_vproj_fit_multiplier=None, gd_fit_bins=None,\
                  ic_center_mode='arithmetic', ic_decision_mode='centers',H0=100., Om0=0.3, Ode0=0.7, showplots=False, saveplotspdf=False):
     """
@@ -80,6 +80,10 @@ def g3groupfinder_luminosity(radeg,dedeg,cz,absrmag,dwarfgiantdivide,fof_bperp=0
         If this parameter is passed, then the fit to vproj,gal vs. N_giants is not performed.
     vproj_fit_multiplier : float
         Scalar multiplier for vproj_fit.
+    vproj_fit_offset : float
+        Vertical offset to fitted boundary model for giant-only merging and dwarf association.
+        i.e. association boundary of vproj_fit_multiplier * model(Ngiant) + vproj_fit_offset.
+        Units: km/s (default 0 km/s)
     gd_rproj_fit_guess : iterable
         Guess supplied to scipy.optimize.curve_fit when fitting gdrproj,gal vs. Ltot.
     gd_rproj_fit_params : iterable
@@ -191,7 +195,7 @@ def g3groupfinder_luminosity(radeg,dedeg,cz,absrmag,dwarfgiantdivide,fof_bperp=0
         vproj_bestfit_err = np.zeros(2)*1.
     
     rproj_boundary = lambda Ngiants: rproj_fit_multiplier*giantmodel(Ngiants, *rproj_bestfit)
-    vproj_boundary = lambda Ngiants: vproj_fit_multiplier*giantmodel(Ngiants, *vproj_bestfit)
+    vproj_boundary = lambda Ngiants: vproj_fit_multiplier*giantmodel(Ngiants, *vproj_bestfit) + vproj_fit_offset
     print('-----------------------')
     print(rproj_boundary(2)) 
     print('------------------------')
