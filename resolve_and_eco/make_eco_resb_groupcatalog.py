@@ -53,7 +53,7 @@ if __name__=='__main__':
     eco.loc[:,'g3fc_l'] = fof.get_central_flag(eco.absrmag.to_numpy(), eco.g3grp_l.to_numpy())
     eco.loc[:,'g3satmhi_l'] = fof.get_satint_mass(np.log10(10**eco.logmgas.to_numpy()/1.4), eco.g3grp_l.to_numpy(), eco.g3fc_l.to_numpy())
     eco.loc[:,'g3cenmhi_l'] = fof.get_central_mass(np.log10(10**eco.logmgas.to_numpy()/1.4), eco.g3grp_l.to_numpy(), eco.g3fc_l.to_numpy())
-    print('here: ', np.sum(eco.g3satmhi_l))
+    eco.loc[:,'g3logmhdyn_l']=fof.dynmass(eco.radeg.to_numpy(),eco.dedeg.to_numpy(),eco.cz.to_numpy(),eco.g3grp_l.to_numpy(),9.9,hubble_const/100.)
     ecog3grpngi=np.zeros_like(ecogrpradeg)
     ecog3grpndw=np.zeros_like(ecogrpradeg)
     for uid in np.unique(ecog3grpid):
@@ -95,6 +95,7 @@ if __name__=='__main__':
     eco.loc[nansel,'g3grpedgeflag2d_l']=-99.
     eco.loc[nansel,'g3grpedgescale2d_l']=-99.
     eco.loc[nansel,'g3grptcross_l']=-99.
+    eco.loc[nansel,'g3logmhdyn_l']=-99.
     eco.to_csv("ECOdata_G3catalog_luminosity.csv",index=False)
     ##########################
     # Group Finding: RESOLVE
@@ -186,6 +187,11 @@ if __name__=='__main__':
     resolveg3grptcross[resbgroupsel]=vz.group_crossing_time(resolve[resbgroupsel].radeg.to_numpy(), resolve[resbgroupsel].dedeg.to_numpy(), resolve[resbgroupsel].cz.to_numpy(),\
         tmpid, H0=hubble_const)    
 
+    resolveg3dynmass=np.zeros_like(resolveg3grpid)-99.
+    resbdynmass = fof.dynmass(resolve[resbgroupsel].radeg.to_numpy(), resolve[resbgroupsel].dedeg.to_numpy(), resolve[resbgroupsel].cz.to_numpy(),\
+        tmpid,9.9,hubble_const/100.)
+    resolveg3dynmass[resbgroupsel]=resbdynmass
+
     # get RESOLVE-A from ECO
     resolvename = resolve.name.to_numpy()
     resname_in_eco = eco.resname.to_numpy()
@@ -212,6 +218,7 @@ if __name__=='__main__':
             resolveg3grptcross[ii]=eco.g3grptcross_l[ecosel]
             resolveg3cenmhi[ii]=eco.g3cenmhi_l[ecosel]
             resolveg3satmhi[ii]=eco.g3satmhi_l[ecosel]
+            resolveg3dynmass[ii]=eco.g3logmhdyn_l[ecosel]
     resolve.loc[:,'g3grp_l']=resolveg3grpid
     resolve.loc[:,'g3logmh_l']=resolveg3logmh
     resolve.loc[:,'g3grplogG_l']=resolveg3grplogG_l
@@ -233,4 +240,5 @@ if __name__=='__main__':
     resolve.loc[:,'g3grpedgeflag2d_l']=resolveg3edgeflag2d
     resolve.loc[:,'g3grpedgescale2d_l']=resolveg3edgescale2d
     resolve.loc[:,'g3grptcross_l']=resolveg3grptcross
+    resolve.loc[:,'g3logmhdyn_l']=resolveg3dynmass
     resolve.to_csv("RESOLVEdata_G3catalog_luminosity.csv")
