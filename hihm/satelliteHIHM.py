@@ -76,7 +76,7 @@ if __name__=='__main__':
     fig.colorbar(sc, label='Late-type Satellite Fraction')
     ax1.legend(loc='best')
     plt.tight_layout()
-    plt.savefig("satelliteHIHM.pdf",dpi=300) 
+    plt.savefig("../figures/satelliteHIHM.pdf",dpi=300) 
     plt.show()
 
     

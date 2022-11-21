@@ -69,6 +69,7 @@ if __name__=='__main__':
     ax.legend(loc='lower right')
     ax.set_xlim(np.min(bc), np.max(bc))
     ax.set_ylim(*ylimits)
+    ax.set_xticks([11,12,13,14])
 
     ################################
     ################################

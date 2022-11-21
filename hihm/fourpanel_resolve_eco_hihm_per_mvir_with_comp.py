@@ -12,6 +12,7 @@ from matplotlib.ticker import MaxNLocator
 from matplotlib import rcParams
 from scipy.ndimage import median_filter
 from mpl_toolkits.axes_grid1.inset_locator import inset_axes
+import pickle
 rcParams['axes.labelsize'] = 9
 rcParams['xtick.labelsize'] = 9
 rcParams['ytick.labelsize'] = 9
@@ -23,7 +24,7 @@ my_locator = MaxNLocator(6)
 singlecolsize = (3.3522420091324205, 2.0717995001590714)
 doublecolsize = (7.100005949910059, 4.3880449973709)
 
-def make_panel(cax,xv,yv,binvalues,xlim,ylim,xlab,ylab,ptcolor='gray',linecolor='k',ptalpha=0.3,linelabel=None):
+def make_panel(cax,xv,yv,binvalues,xlim,ylim,xlab,ylab,ptcolor='gray',linecolor='k',ptalpha=0.3,linelabel=None,pkl=None):
     cax.scatter(xv,yv,color=ptcolor,alpha=ptalpha,s=2)
     median,bc,binedges,_ = cbs(xv, yv, 'median', bins=binvalues)
     medianerr = np.std(np.array([sbs(yv[np.where(np.logical_and(xv>binedges[i-1], xv<=binedges[i]))],\
@@ -37,6 +38,8 @@ def make_panel(cax,xv,yv,binvalues,xlim,ylim,xlab,ylab,ptcolor='gray',linecolor=
     cax.set_ylim(ylim)
     cax.set_xlabel(xlab)
     cax.set_ylabel(ylab)
+    if pkl is not None:
+        pickle.dump([bc,median],open(pkl,'wb'))
     return cax
 
 if __name__=='__main__':
@@ -52,12 +55,13 @@ if __name__=='__main__':
     ecog3 = ecog3[ecog3.g3fc_l>0]
     xvalue = ecog3.g3logmh_l.to_numpy() 
     yvalue = np.log10(10**ecog3.g3grpmhi_l.to_numpy()/10**xvalue)
-    ax=make_panel(ax,xvalue,yvalue,binvalues,xlimits,ylimits,None,"log group-integrated mass fraction", linelabel=r'$M_{\rm HI,\, grp}/M_{\rm vir}$ (ECO - RES-A)')
+    ax=make_panel(ax,xvalue,yvalue,binvalues,xlimits,ylimits,None,"log group-integrated mass fraction", linelabel=r'$M_{\rm HI,\, grp}/M_{\rm vir}$ (ECO - RES-A)',\
+        pkl='mhi_over_mvir_ecowresa.pkl')
 
     yvalue_star = np.log10(10**ecog3.g3grplogS_l.to_numpy()/10**xvalue)
-    ax=make_panel(ax,xvalue,yvalue_star,binvalues,None,None,None,None,linecolor='midnightblue',ptalpha=0,linelabel=r'$M_{*,\,\rm grp}/M_{\rm vir}$ (ECO - RES-A)')
+    ax=make_panel(ax,xvalue,yvalue_star,binvalues,None,None,None,None,linecolor='darkorange',ptalpha=0,linelabel=r'$M_{*,\,\rm grp}/M_{\rm vir}$ (ECO - RES-A)')
     yvalue_bary = np.log10(10**ecog3.g3grplogB_l.to_numpy()/10**xvalue)
-    ax=make_panel(ax,xvalue,yvalue_bary,binvalues,None,None,None,None,linecolor='saddlebrown',ptalpha=0,linelabel=r'$M_{\rm bary,\, grp}/M_{\rm vir}$ (ECO - RES-A)')
+    ax=make_panel(ax,xvalue,yvalue_bary,binvalues,None,None,None,None,linecolor='lightgreen',ptalpha=0,linelabel=r'$M_{\rm bary,\, grp}/M_{\rm vir}$ (ECO - RES-A)')
     ### ax -- RESOLVE (all) (G3) ###
     resg3 = pd.read_csv("../resolve_and_eco/RESOLVEdata_G3catalog_luminosity.csv")
     resg3 = resg3[(resg3.fl_insample==1)&(resg3.g3grpcz_l>4500)&(resg3.g3grpcz_l<7000)]
@@ -79,9 +83,9 @@ if __name__=='__main__':
     ax1=make_panel(ax1,xvalue,yvalue,binvalues,xlimits,ylimits,None,"log group-integrated mass fraction", linelabel=r'$M_{\rm HI,\, grp}/M_{\rm vir}$ (ECO - RES-A)')
 
     yvalue_star = np.log10(10**ecofof.logmstargrp.to_numpy()/10**xvalue)
-    ax1=make_panel(ax1,xvalue,yvalue_star,binvalues,None,None,None,None,linecolor='midnightblue',ptalpha=0,linelabel=r'$M_{*,\,\rm grp}/M_{\rm vir}$ (ECO - RES-A)')
+    ax1=make_panel(ax1,xvalue,yvalue_star,binvalues,None,None,None,None,linecolor='darkorange',ptalpha=0,linelabel=r'$M_{*,\,\rm grp}/M_{\rm vir}$ (ECO - RES-A)')
     yvalue_bary = np.log10(10**ecofof.logmbarygrp.to_numpy()/10**xvalue)
-    ax1=make_panel(ax1,xvalue,yvalue_bary,binvalues,None,None,None,None,linecolor='saddlebrown',ptalpha=0,linelabel=r'$M_{\rm bary,\, grp}/M_{\rm vir}$ (ECO - RES-A)')
+    ax1=make_panel(ax1,xvalue,yvalue_bary,binvalues,None,None,None,None,linecolor='lightgreen',ptalpha=0,linelabel=r'$M_{\rm bary,\, grp}/M_{\rm vir}$ (ECO - RES-A)')
 
     resfof = pd.read_csv("RESOLVEliving_071322_updatedfofgroups.csv")
     resfof = resfof[(resfof.fl_insample==1)&(resfof.grpcz>4500)&(resfof.grpcz<7000)]
@@ -93,4 +97,5 @@ if __name__=='__main__':
     ax1.annotate("FoF",xy=annopos,fontsize=16)
     plt.tight_layout()
     plt.savefig("../figures/MHI_over_Mvir.pdf",dpi=300)
+    plt.savefig("../MSdefensefigs/figs/MHI_over_Mvir.png",dpi=1000)
     plt.show()

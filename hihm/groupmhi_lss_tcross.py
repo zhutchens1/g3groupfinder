@@ -76,12 +76,14 @@ if __name__=='__main__':
     srt_by_bin(xval,yval,zval,[11,11.4,12,13,15]) 
 
     ## ax1 (tcross)
-    g3 = g3[g3.g3grptcross_l>0.0]
-    xval = np.log10(g3.g3grptcross_l.to_numpy())
+    g3 = g3[(g3.g3grptcross_l*0.07>0.0)&(0.07*g3.g3grptcross_l<1.5)]
+    xval = (g3.g3grptcross_l.to_numpy() * 0.07)
+    print(min(xval),max(xval))
+    xbinedges=np.linspace(0,1.5,6)
     yval = np.log10(10**g3.g3grpmhi_l.to_numpy() / 10**g3.g3logmh_l.to_numpy())
     zval = g3.g3logmh_l.to_numpy()
-    make_panel(ax1, xval, yval, zval, [11,11.4,12,13,15], labels=binlabels, xbinedges=np.log10(np.array([0.001, 5, 13 , 40])))
-    ax1.set_xlabel(r"log group $t_{\rm cross}$ [Gyr]")#\, \rho_{\rm LS}$")
+    make_panel(ax1, xval, yval, zval, [11,11.4,12,13,15], labels=binlabels, xbinedges=xbinedges)
+    ax1.set_xlabel(r"$t_{\rm cross}H_0$")#\, \rho_{\rm LS}$")
     #ax1.set_ylabel(r"$\log \, M_{\rm vir}$ [$\rm M_\odot$]")
     print('tcross spearman-rank results:')
     srt_by_bin(xval,yval,zval,[11,11.4,12,13,15]) 

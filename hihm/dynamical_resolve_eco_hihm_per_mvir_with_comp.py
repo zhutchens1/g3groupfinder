@@ -1,3 +1,4 @@
+import pickle
 import sys
 sys.path.insert(0,'../g3algo/')
 import iterativecombination as ic
@@ -53,12 +54,18 @@ if __name__=='__main__':
     
     grpn = np.array(ecog3.g3grpngi_l+ecog3.g3grpndw_l)
     xvalue=np.zeros_like(grpn)
-    highgrpn = (grpn>4)
+    highgrpn = (grpn>2)
+    print(grpn[highgrpn], grpn[~highgrpn])
+    print(np.sum(highgrpn),np.sum(~highgrpn))
+
     xvalue[highgrpn] = ecog3.g3logmhdyn_l.to_numpy()[highgrpn]
     print(np.median(ecog3.g3logmh_l.to_numpy()[highgrpn] - ecog3.g3logmhdyn_l.to_numpy()[highgrpn]))
     xvalue[~highgrpn] = ecog3.g3logmh_l.to_numpy()[~highgrpn] 
     yvalue = np.log10(10**ecog3.g3grpmhi_l.to_numpy()/10**xvalue)
     ax=make_panel(ax,xvalue,yvalue,binvalues,xlimits,ylimits,None,"log group-integrated mass fraction", linelabel=r'$M_{\rm HI,\, grp}/M_{\rm vir}$ (ECO - RES-A)')
+
+    HAMbc, HAMmedian = pickle.load(open('mhi_over_mvir_ecowresa.pkl','rb'))
+    ax.plot(HAMbc, HAMmedian, color='green', linewidth=4)
 
     yvalue_star = np.log10(10**ecog3.g3grplogS_l.to_numpy()/10**xvalue)
     ax=make_panel(ax,xvalue,yvalue_star,binvalues,None,None,None,None,linecolor='midnightblue',ptalpha=0,linelabel=r'$M_{*,\,\rm grp}/M_{\rm vir}$ (ECO - RES-A)')
@@ -83,3 +90,7 @@ if __name__=='__main__':
     plt.tight_layout()
     plt.savefig("../figures/MHI_over_Mvir_dyn.pdf",dpi=300)
     plt.show()
+
+    #plt.figure()
+    #plt.plot(ecog3.g3logmhdyn_l.to_numpy(), ecog3.g3logmh_l.to_numpy(), 'k.')
+    #plt.show()

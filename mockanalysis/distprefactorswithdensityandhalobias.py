@@ -87,6 +87,8 @@ if __name__=='__main__':
             #axs[ii][jj].grid(which='both', axis='x')
     axs[1][0].legend(loc='lower left', framealpha=1, ncol=2)
     fig.text(0.5, 0.003, r"Galaxy Number Density [${\rm Mpc}^{-3}$]", ha='center')
+    fig.text(0.01, 0.35, r"Purity or Completeness", ha='center', rotation='vertical')
     plt.tight_layout()
     plt.savefig("../figures/prefacs_with_dens.pdf",dpi=300)
+    plt.savefig("../figures/prefacs_with_dens.jpg",dpi=300)
     plt.show()
