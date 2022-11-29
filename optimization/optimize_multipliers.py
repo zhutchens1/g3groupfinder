@@ -47,10 +47,10 @@ def fast_grid_search(multsets,objective_fn):
     return results
 
 def get_score(radeg,dedeg,cz,absrmag,divide,truegroupID,trueloghalomass,halo_ngal,ecovolume,rproj_fit_multiplier,\
-              vproj_fit_multiplier,vproj_fit_offset,gd_rproj_fit_multiplier, gd_vproj_fit_multiplier):
+              vproj_fit_multiplier,vproj_fit_offset,gd_rproj_fit_multiplier, gd_vproj_fit_multiplier, gd_vproj_fit_offset):
     gfparams = dict({'volume':ecovolume,'rproj_fit_multiplier':rproj_fit_multiplier,'vproj_fit_multiplier':vproj_fit_multiplier,\
            'vproj_fit_offset':vproj_fit_offset,'gd_rproj_fit_multiplier':rproj_fit_multiplier, 'gd_vproj_fit_multiplier':gd_vproj_fit_multiplier,\
-           'gd_fit_bins':np.arange(-24,-19,0.25),\
+           'gd_vproj_fit_offset':gd_vproj_fit_offset,'gd_fit_bins':np.arange(-24,-19,0.25),\
            'gd_rproj_fit_guess':[1e-5, 0.4], 'gd_vproj_fit_guess':[3e-5,4e-1], 'H0':100.,\
            'iterative_giant_only_groups':True, 'ic_decision_mode':'centers'})
     grpid = g3gf(radeg,dedeg,cz,absrmag,divide,**gfparams)[0]
@@ -81,22 +81,24 @@ if __name__=='__main__':
     loghalom = mock.loghalom.to_numpy()
     halo_ngal = mock.halo_ngal.to_numpy()
     def objective(mult):
-        return get_score(radeg,dedeg,cz,absrmag,-19.5,haloid,loghalom,halo_ngal,192351.,mult[0],mult[1],mult[2],mult[3],mult[4])
+        return get_score(radeg,dedeg,cz,absrmag,-19.5,haloid,loghalom,halo_ngal,192351.,mult[0],mult[1],mult[2],mult[3],mult[4],mult[5])
    
-    if False: 
+    if True: 
         # do grid serch
         rproj_fit__candid = [2.5,3,3.5]#[2,3,4]#[1,3,5,7]
         vproj_fit__candid =  [2.5,3,3.5]#[2,3,4]#[1,3,5,7]
         vproj_off__candid = [200]#[150,200,250]#[100,200,300,400]
         gd_rproj_fit__candid =  [1.5,2,2.5]#[2,3,4]#[1,3,5,7]
         gd_vproj_fit__candid = [3.5,4,4.5]#[4,5,6]#[1,3,5,7]
+        gd_vproj_off__candid = [0]
         candid=[]
         for R1 in rproj_fit__candid:
             for V1 in vproj_fit__candid:
                 for Voffset in vproj_off__candid:
                     for R2 in gd_rproj_fit__candid:
                         for V2 in gd_vproj_fit__candid:
-                            candid.append((R1,V1,Voffset,R2,V2))
+                            for gdVoffset in gd_vproj_off__candid:
+                                candid.append((R1,V1,Voffset,R2,V2,gdVoffset))
         candid=np.array(candid)
 
         print(candid)
@@ -108,4 +110,7 @@ if __name__=='__main__':
         print('best mult from grid search', bestgridmult) 
         print('done in {} seconds'.format(time.time()-ti))
 
-    print(objective((2.5,3.5,200,1.5,3.5))) 
+        outdf = pd.DataFrame(candid,columns=['rproj_fit_mult','vproj_fit_mult','vproj_fit_offset','gd_rproj_fit_mult', 'gd_vproj_fit_mult', 'gd_vproj_fit_offset'])
+        outdf.loc[:,'score']=scores
+        print(outdf) 
+    #print(objective((2.5,3.5,200,1.5,3.5,0))) 
