@@ -25,8 +25,8 @@ def decayexp(x, a, b):
 def g3groupfinder_luminosity(radeg,dedeg,cz,absrmag,dwarfgiantdivide,fof_bperp=0.07,fof_blos=1.1,fof_sep=None, volume=None, center_mode='average',\
                  iterative_giant_only_groups=False, n_bootstraps=10000, rproj_fit_guess=None, rproj_fit_params = None, rproj_fit_multiplier=None,\
                  vproj_fit_guess = None, vproj_fit_params = None, vproj_fit_multiplier=None, vproj_fit_offset=0, gd_rproj_fit_guess=None, gd_rproj_fit_params = None,\
-                 gd_rproj_fit_multiplier=None, gd_vproj_fit_guess=None, gd_vproj_fit_params = None, gd_vproj_fit_multiplier=None, gd_fit_bins=None,\
-                 ic_center_mode='arithmetic', ic_decision_mode='centers',H0=100., Om0=0.3, Ode0=0.7, showplots=False, saveplotspdf=False):
+                 gd_rproj_fit_multiplier=None, gd_vproj_fit_guess=None, gd_vproj_fit_params = None, gd_vproj_fit_multiplier=None,gd_vproj_fit_offset=None,
+                 gd_fit_bins=None,ic_center_mode='arithmetic', ic_decision_mode='centers',H0=100., Om0=0.3, Ode0=0.7, showplots=False, saveplotspdf=False):
     """
     Identify galaxy groups in redshift space using the RESOLVE-G3 algorithm (Hutchens et al. 2022).
 
@@ -98,6 +98,9 @@ def g3groupfinder_luminosity(radeg,dedeg,cz,absrmag,dwarfgiantdivide,fof_bperp=0
         If this parameter is passed, then the fit to gd_vproj,gal vs. N_giants is not performed.
     gd_vproj_fit_multiplier : float
         Scalar multiplier of gd_vproj_fit for use in dwarf-only group finding.
+    gd_vproj_fit_offset : float
+        Vertical offset to fitted boundary model for dwarf-only group finding.
+        i.e. boundary of gd_vproj_fit_multiplier * model(group Lr) + gd_vproj_fit_offset
     gd_fit_bins : iterable
         Array of bin edges for binning and fitting properties of giant+dwarf groups prior to
         dwarf-only group finding. 
@@ -255,7 +258,7 @@ def g3groupfinder_luminosity(radeg,dedeg,cz,absrmag,dwarfgiantdivide,fof_bperp=0
         gd_vproj_bestfit = np.array(gd_vproj_fit_params)
         gd_vproj_bestfit_err = np.zeros(len(gd_vproj_fit_params))*1.
     rproj_for_iteration = lambda M: gd_rproj_fit_multiplier*decayexp(M, *gd_rproj_bestfit)
-    vproj_for_iteration = lambda M: gd_vproj_fit_multiplier**decayexp(M, *gd_vproj_bestfit)
+    vproj_for_iteration = lambda M: gd_vproj_fit_multiplier*decayexp(M, *gd_vproj_bestfit) + gd_vproj_fit_offset
 
     ### --------- iterative combination to make dwarf-only groups
     assert (g3grpid[(absrmag<=dwarfgiantdivide)]!=-99.).all(), "Not all giants are grouped." 
