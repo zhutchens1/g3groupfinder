@@ -86,10 +86,10 @@ if __name__=='__main__':
         # do grid serch
         rproj_fit__candid = [2.5,3,3.5]#[2,3,4]#[1,3,5,7]
         vproj_fit__candid =  [2.5,3,3.5]#[2,3,4]#[1,3,5,7]
-        vproj_off__candid = [200]#[150,200,250]#[100,200,300,400]
+        vproj_off__candid = [100,200,300]#[150,200,250]#[100,200,300,400]
         gd_rproj_fit__candid =  [1.5,2,2.5]#[2,3,4]#[1,3,5,7]
-        gd_vproj_fit__candid = [3.5,4,4.5]#[4,5,6]#[1,3,5,7]
-        gd_vproj_off__candid = [0]
+        gd_vproj_fit__candid = [1,3,5,7]#[3.5,4,4.5]#[4,5,6]#[1,3,5,7]
+        gd_vproj_off__candid = [100,200,300]
         candid=[]
         for R1 in rproj_fit__candid:
             for V1 in vproj_fit__candid:
@@ -111,7 +111,7 @@ if __name__=='__main__':
 
         outdf = pd.DataFrame(candid,columns=['rproj_fit_mult','vproj_fit_mult','vproj_fit_offset','gd_rproj_fit_mult', 'gd_vproj_fit_mult', 'gd_vproj_fit_offset'])
         scoredf = pd.DataFrame(scores,columns=['mu_HME','P_G','C_G','P_H','C_H'])
-        outdf = outdf.merge(right=scoredf,how='outer')
+        outdf = outdf.join(scoredf,how='outer')
         print(outdf)
 
     #print(objective((2.5,3.5,200,1.5,3.5,0))) 
