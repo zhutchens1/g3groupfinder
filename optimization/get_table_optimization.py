@@ -25,7 +25,6 @@ def dynmass(galra,galdec,galcz,galgrpid,Aval=9.9,h=0.7):
            sigma_squared[sel]=-99.
     GG = 4.3e-9 # Mpc km^2 s^-2 M_sun^-1
     mdyn = Aval*sigma_squared*Rproj/GG
-    sel=np.where(galgrpid==881.)
     mdyn[np.where(mdyn<=0)]=1.
     return np.log10(mdyn)
 
@@ -59,15 +58,18 @@ def get_score(radeg,dedeg,cz,absrmag,divide,truegroupID,trueloghalomass,halo_nga
     for ii,hh in enumerate(haloid):
         sel = np.where(grpid==hh)
         g3logmh[sel]=halomasses[ii]
+    g3logmhdyn = dynmass(radeg,dedeg,cz,grpid,Aval=9.9,h=1) 
     weights = 1./fof.multiplicity_function(grpid,return_by_galaxy=True)#np.array((1/mockdf.ecog3grpn_l)/np.sum(1/mockdf.ecog3grpn_l))
-    
+     
     my_halo_ngal = fof.multiplicity_function(truegroupID,True)
     computesel = (my_halo_ngal==halo_ngal)
     muHME = weighted_percentile(np.abs(np.array(g3logmh[computesel] - loghalom[computesel])), weights[computesel], 0.5)
     P_G, C_G = get_metrics_by_group(grpid[computesel], truegroupID[computesel], absrmag[computesel]) 
-    P_H, C_H = get_metrics_by_halo(grpid[computesel], truegroupID[computesel], absrmag[computesel]) 
-    score = 1 - (np.mean(P_G)*np.mean(C_G)*np.mean(P_H)*np.mean(C_H) - 2*muHME)
-    return (muHME, np.mean(P_G),np.mean(C_G),np.mean(P_H),np.mean(C_H))
+    P_H, C_H = get_metrics_by_halo(grpid[computesel], truegroupID[computesel], absrmag[computesel])
+    dynsel = computesel & (weights<1/7.)
+    print('dyn: ', g3logmhdyn[dynsel])
+    muHMEdyn = weighted_percentile(np.abs(np.array(g3logmhdyn[dynsel] - loghalom[dynsel])), weights[dynsel], 0.5) 
+    return (muHME,muHMEdyn, np.mean(P_G),np.mean(C_G),np.mean(P_H),np.mean(C_H))
 
 if __name__=='__main__':
     mock = pd.read_hdf("../halobiasmocks/fiducial/ECO_cat_0_Planck_memb_cat.hdf5")
@@ -84,12 +86,12 @@ if __name__=='__main__':
    
     if True: 
         # do grid serch
-        rproj_fit__candid = [2.5,3,3.5]#[2,3,4]#[1,3,5,7]
-        vproj_fit__candid =  [2.5,3,3.5]#[2,3,4]#[1,3,5,7]
-        vproj_off__candid = [100,200,300]#[150,200,250]#[100,200,300,400]
-        gd_rproj_fit__candid =  [1.5,2,2.5]#[2,3,4]#[1,3,5,7]
-        gd_vproj_fit__candid = [1,3,5,7]#[3.5,4,4.5]#[4,5,6]#[1,3,5,7]
-        gd_vproj_off__candid = [100,200,300]
+        rproj_fit__candid = np.random.uniform(0.5,10,3)#[1,2.5,4]# [2.5,3,3.5]#[2,3,4]#[1,3,5,7]
+        vproj_fit__candid = np.random.uniform(0.5,10,3)# [2.5,3,3.5]#[2,3,4]#[1,3,5,7]
+        vproj_off__candid = [200]#[150,200,250]#[100,200,300,400]
+        gd_rproj_fit__candid = np.random.uniform(0.5,10,3)#[1.5,2,2.5]#[2,3,4]#[1,3,5,7]
+        gd_vproj_fit__candid = np.random.uniform(0.5,10,3)#[3.5,4,4.5]#[4,5,6]#[1,3,5,7]
+        gd_vproj_off__candid = [0]
         candid=[]
         for R1 in rproj_fit__candid:
             for V1 in vproj_fit__candid:
@@ -104,14 +106,19 @@ if __name__=='__main__':
         import time
         ti = time.time()
         scores = fast_grid_search(candid,objective)
-        print("best score from grid search", np.min(scores))
-        bestgridmult = candid[np.argmin(scores)]
-        print('best mult from grid search', bestgridmult) 
+        print(scores)
+        #print("best score from grid search", np.min(scores))
+        #bestgridmult = candid[np.argmin(scores)]
+        #print('best mult from grid search', bestgridmult) 
         print('done in {} seconds'.format(time.time()-ti))
 
         outdf = pd.DataFrame(candid,columns=['rproj_fit_mult','vproj_fit_mult','vproj_fit_offset','gd_rproj_fit_mult', 'gd_vproj_fit_mult', 'gd_vproj_fit_offset'])
-        scoredf = pd.DataFrame(scores,columns=['mu_HME','P_G','C_G','P_H','C_H'])
+        scoredf = pd.DataFrame(scores,columns=['mu_HME','mu_HME_dyn','P_G','C_G','P_H','C_H'])
         outdf = outdf.join(scoredf,how='outer')
+        outdf.to_csv("table_group_params.csv",index=False)
         print(outdf)
 
-    #print(objective((2.5,3.5,200,1.5,3.5,0))) 
+    print(objective((1,3,200,1,3,0)))
+    print(objective((1,3,200,3,3,0)))
+    # note: when giant group finding params. are fixed, changing the dwarf params tend to have little effect: vast, vast majority
+    # of dwarf-only groups are N=1 and thus if most of them are identified as N=1, mean is not affected
