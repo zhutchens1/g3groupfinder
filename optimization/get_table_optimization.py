@@ -58,8 +58,9 @@ def get_score(radeg,dedeg,cz,absrmag,divide,truegroupID,trueloghalomass,halo_nga
     for ii,hh in enumerate(haloid):
         sel = np.where(grpid==hh)
         g3logmh[sel]=halomasses[ii]
-    g3logmhdyn = dynmass(radeg,dedeg,cz,grpid,Aval=9.9,h=1) 
-    weights = 1./fof.multiplicity_function(grpid,return_by_galaxy=True)#np.array((1/mockdf.ecog3grpn_l)/np.sum(1/mockdf.ecog3grpn_l))
+    g3logmhdyn = dynmass(radeg,dedeg,cz,grpid,Aval=9.9,h=1)
+    grpn = fof.multiplicity_function(grpid,return_by_galaxy=True) 
+    weights = 1./grpn#np.array((1/mockdf.ecog3grpn_l)/np.sum(1/mockdf.ecog3grpn_l))
      
     my_halo_ngal = fof.multiplicity_function(truegroupID,True)
     computesel = (my_halo_ngal==halo_ngal)
@@ -67,9 +68,36 @@ def get_score(radeg,dedeg,cz,absrmag,divide,truegroupID,trueloghalomass,halo_nga
     P_G, C_G = get_metrics_by_group(grpid[computesel], truegroupID[computesel], absrmag[computesel]) 
     P_H, C_H = get_metrics_by_halo(grpid[computesel], truegroupID[computesel], absrmag[computesel])
     dynsel = computesel & (weights<1/7.)
-    print('dyn: ', g3logmhdyn[dynsel])
-    muHMEdyn = weighted_percentile(np.abs(np.array(g3logmhdyn[dynsel] - loghalom[dynsel])), weights[dynsel], 0.5) 
-    return (muHME,muHMEdyn, np.mean(P_G),np.mean(C_G),np.mean(P_H),np.mean(C_H))
+    muHMEdyn = weighted_percentile(np.abs(np.array(g3logmhdyn[dynsel] - loghalom[dynsel])), weights[dynsel], 0.5)
+    muHME_HAMhighN = weighted_percentile(np.abs(np.array(g3logmh[dynsel] - loghalom[dynsel])), weights[dynsel], 0.5)
+
+    # output statistics
+    bygalaxydf = pd.DataFrame(np.array([grpid[computesel], P_G, C_G, P_H, C_H, g3logmh[computesel], grpn[computesel], absrmag[computesel], trueloghalomass[computesel]]).T,columns=['grpid','P_G','C_G','P_H','C_H','g3logmh','grpn', 'absrmag', 'loghalom'])
+    bygroupdf = bygalaxydf.groupby('grpid').first()
+    meanPg = np.mean(bygroupdf.P_G.to_numpy())
+    meanCg = np.mean(bygroupdf.C_G.to_numpy())
+    byhalodf = bygalaxydf.groupby('haloid').first()
+    meanPh = np.mean(byhalodf.P_H.to_numpy())
+    meanCh = np.mean(byhalodf.C_H.to_numpy())
+    dwarfgroups_by_gal = bygalaxydf.groupby('grpid').filter(lambda grp: (grp.absrmag>-19.5).all())
+    dwarfgroups_by_grp = dwarfgroups_by_gal.groupby('grpid').first()
+    meanPgdw = np.mean(dwarfgroups_by_grp.P_G.to_numpy())
+    meanCgdw = np.mean(dwarfgroups_by_grp.C_G.to_numpy())
+    dwarfhalos_by_halo = dwarfgroups_by_gal.groupby('haloid').first()
+    meanPhdw = np.mean(dwarfhalos_by_halo.P_H.to_numpy())
+    meanChdw = np.mean(dwarfhalos_by_halo.C_H.to_numpy())
+    muHMEdw = weighted_percentile(np.abs(np.array(dwarfgroups_by_gal.g3logmh.to_numpy()-dwarfgroups_by_gal.loghalom.to_numpy())), 1/dwarfgroups_by_gal.grpn.to_numpy(), 0.5)
+    ngt1_dwgr_bygal = dwarfgroups_by_gal[dwarfgroups_by_gal.grpn>1]
+    ngt1_dwgr_bygrp = ngt1_dwgr_bygal.groupby('grpid').first()
+    ngt1_dwgr_byhal = ngt1_dwgr_bygal.groupby('haloid').first()
+    print("# N>1 dwarf-only groups: ", len(ngt1_dwgr_bygrp))
+    meanPgdwgt1 = np.mean(ngt1_dwgr_bygrp.P_G.to_numpy())
+    meanCgdwgt1 = np.mean(ngt1_dwgr_bygrp.C_G.to_numpy())
+    meanPhdwgt1 = np.mean(ngt1_dwgr_byhalo.P_H.to_numpy())
+    meanChdwgt1 = np.mean(ngt1_dwgr_byhalo.C_H.to_numpy())
+    muHMEdwgt1 = weighted_percentile(np.abs(np.array(ngt1_dwgr_bygal.g3logmh.to_numpy()-ngt1_dwgr_bygal.loghalom.to_numpy())), 1/ngt1_dwgr_bygal.grpn.to_numpy(), 0.5)
+    return (muHME, muHMEdyn, muHME_HAMhighN, meanPg, meanCg, meanPh, meanCh, muHMEdw, meanPgdw, meanCgdw, meanPhdw, meanChdw, meanPgdwgt1, meanCgdwgt1, meanPhdwgt1, meanChdwgt1, muHMEdwgt1) 
+    #return (muHME,muHMEdyn, np.mean(P_G),np.mean(C_G),np.mean(P_H),np.mean(C_H))
 
 if __name__=='__main__':
     mock = pd.read_hdf("../halobiasmocks/fiducial/ECO_cat_0_Planck_memb_cat.hdf5")
@@ -86,12 +114,12 @@ if __name__=='__main__':
    
     if True: 
         # do grid serch
-        rproj_fit__candid = np.random.uniform(0.5,10,3)#[1,2.5,4]# [2.5,3,3.5]#[2,3,4]#[1,3,5,7]
-        vproj_fit__candid = np.random.uniform(0.5,10,3)# [2.5,3,3.5]#[2,3,4]#[1,3,5,7]
-        vproj_off__candid = [200]#[150,200,250]#[100,200,300,400]
-        gd_rproj_fit__candid = np.random.uniform(0.5,10,3)#[1.5,2,2.5]#[2,3,4]#[1,3,5,7]
-        gd_vproj_fit__candid = np.random.uniform(0.5,10,3)#[3.5,4,4.5]#[4,5,6]#[1,3,5,7]
-        gd_vproj_off__candid = [0]
+        rproj_fit__candid = [1,2,3,4,5,6]#np.random.uniform(0.5,10,3)#[1,2.5,4]# [2.5,3,3.5]#[2,3,4]#[1,3,5,7]
+        vproj_fit__candid = [1,2,3,4,5,6]#np.random.uniform(0.5,10,3)# [2.5,3,3.5]#[2,3,4]#[1,3,5,7]
+        vproj_off__candid = [100,200,300]#[150,200,250]#[100,200,300,400]
+        gd_rproj_fit__candid = [1,2,3,4,5,6]#np.random.uniform(0.5,10,3)#[1.5,2,2.5]#[2,3,4]#[1,3,5,7]
+        gd_vproj_fit__candid = [1,2,3,4,5,6]#np.random.uniform(0.5,10,3)#[3.5,4,4.5]#[4,5,6]#[1,3,5,7]
+        gd_vproj_off__candid = [0,100,200,300]
         candid=[]
         for R1 in rproj_fit__candid:
             for V1 in vproj_fit__candid:
@@ -113,7 +141,8 @@ if __name__=='__main__':
         print('done in {} seconds'.format(time.time()-ti))
 
         outdf = pd.DataFrame(candid,columns=['rproj_fit_mult','vproj_fit_mult','vproj_fit_offset','gd_rproj_fit_mult', 'gd_vproj_fit_mult', 'gd_vproj_fit_offset'])
-        scoredf = pd.DataFrame(scores,columns=['mu_HME','mu_HME_dyn','P_G','C_G','P_H','C_H'])
+        scoredf = pd.DataFrame(scores,columns=['mu_HME','mu_HME_dyn','mu_HME_HAMngt7','P_G','C_G','P_H','C_H','mu_HME_dw','P_G_dw','C_G_dw','P_H_dw','C_H_dw',\
+            'P_G_dwgt1','C_G_dwgt1','P_H_dwgt1','C_H_dwgt1','mu_HME_dwgt1'])
         outdf = outdf.join(scoredf,how='outer')
         outdf.to_csv("table_group_params.csv",index=False)
         print(outdf)
