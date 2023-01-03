@@ -59,6 +59,7 @@ def iterative_combination(galaxyra, galaxydec, galaxycz, galaxymag, rprojboundar
     niter=0
     while (not converged):
         print("iteration {} in progress...".format(niter))
+        print(np.average(itassocid))
         # Compute based on updated ID number
         olditassocid = itassocid
         itassocid = nearest_neighbor_assign(galaxyra, galaxydec, galaxycz, galaxymag, olditassocid, rprojboundary, vprojboundary, centermethod, decisionmode, H0=H0)
@@ -282,12 +283,14 @@ def fit_in_group(galra, galdec, galcz, galgrpid, galmag, rprojboundary, vprojbou
         seed2sel = (galgrpid==uniqIDnums[1])
         seed2grpra,seed2grpdec,seed2grpcz = group_skycoords(galra[seed2sel],galdec[seed2sel],galcz[seed2sel],galgrpid[seed2sel])
         allgrpra,allgrpdec,allgrpcz = group_skycoords(galra, galdec, galcz, np.zeros_like(galra)) # center of all galaxies
-        seed1radialsep = (seed1grpcz[0]+allgrpcz[0])/100. * np.sin(angular_separation(allgrpra[0],allgrpdec[0],seed1grpra[0],seed1grpdec[0])/2.)
+        seed1radialsep = (seed1grpcz[0]+allgrpcz[0])/H0 * np.sin(angular_separation(allgrpra[0],allgrpdec[0],seed1grpra[0],seed1grpdec[0])/2.)
         seed1lossep = np.abs(seed1grpcz[0]-allgrpcz[0])
-        seed2radialsep = (seed2grpcz[0]+allgrpcz[0])/100. * np.sin(angular_separation(allgrpra[0],allgrpdec[0],seed2grpra[0],seed2grpdec[0])/2.)
+        seed2radialsep = (seed2grpcz[0]+allgrpcz[0])/H0 * np.sin(angular_separation(allgrpra[0],allgrpdec[0],seed2grpra[0],seed2grpdec[0])/2.)
         seed2lossep = np.abs(seed2grpcz[0]-allgrpcz[0])
         fitingroup1 = (seed1radialsep<rprojboundary(memberintmag)).all() and (seed1lossep<vprojboundary(memberintmag)).all()
         fitingroup2 = (seed2radialsep<rprojboundary(memberintmag)).all() and (seed2lossep<vprojboundary(memberintmag)).all()
+        print('v: ',vprojboundary(memberintmag))
+        print('r: ',rprojboundary(memberintmag))
         fitingroup = fitingroup1 and fitingroup2
     else:
         assert False, "Function argument `decisionmode` must be either `allgalaxies` or `centers`."
