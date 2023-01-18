@@ -1,0 +1,16 @@
+Table A1 
+Measurements of the H I-halo Mass Relation
+
+
+$\mathrm{log}{M}_{{\rm{h}}}$ range      N_halo  $\langle \mathrm{log}{M}_{{\rm{H}}{\rm{I}}}{\rangle }_{{N}_{{\rm{g}}}\geqslant 1}$      $\langle \mathrm{log}{M}_{{\rm{H}}{\rm{I}}}{\rangle }_{{N}_{{\rm{g}}}\geqslant 2}$      $\langle \mathrm{log}{M}_{{\rm{H}}{\rm{I}}}{\rangle }_{{N}_{{\rm{g}}}\geqslant 3}$      $\langle \mathrm{log}{M}_{{\rm{H}}{\rm{I}}}{\rangle }_{{N}_{{\rm{g}}}\geqslant 4}$      $\langle \mathrm{log}{M}_{{\rm{H}}{\rm{I}}}{\rangle }_{{N}_{{\rm{g}}}\geqslant 5}$      $\langle \mathrm{log}{M}_{{\rm{H}}{\rm{I}}}{\rangle }_{{N}_{{\rm{g}}}\geqslant 6}$      
+[11.0, 11.25]   949     8.951 +or- 0.020        9.167 +or- 0.114        cdots   cdots   cdots   cdots   
+[11.25, 11.5]   3494    9.239 +or- 0.011        9.445 +or- 0.036        9.626 +or- 0.106        9.757 +or- 0.320        cdots   cdots   
+[11.5, 11.75]   5472    9.436 +or- 0.008        9.660 +or- 0.024        9.831 +or- 0.070        10.046 +or- 0.150       cdots   cdots   
+[11.75, 12.0]   7021    9.467 +or- 0.007        9.733 +or- 0.016        9.918 +or- 0.039        10.072 +or- 0.081       9.869 +or- 0.156        cdots   
+[12.0, 12.25]   3903    9.613 +or- 0.010        9.798 +or- 0.016        9.938 +or- 0.029        10.009 +or- 0.053       9.914 +or- 0.094        10.074 +or- 0.167       
+[12.25, 12.5]   2074    9.708 +or- 0.014        9.805 +or- 0.018        9.914 +or- 0.027        9.920 +or- 0.041        10.047 +or- 0.059       10.121 +or- 0.088       
+[12.5, 12.75]   1375    9.760 +or- 0.017        9.858 +or- 0.021        9.922 +or- 0.026        10.001 +or- 0.035       10.025 +or- 0.047       10.099 +or- 0.064       
+[12.75, 13.0]   803     9.875 +or- 0.022        9.941 +or- 0.025        9.994 +or- 0.028        10.078 +or- 0.034       10.073 +or- 0.042       10.170 +or- 0.050       
+[13.0, 13.5]    646     10.081 +or- 0.024       10.104 +or- 0.026       10.100 +or- 0.027       10.117 +or- 0.029       10.117 +or- 0.032       10.124 +or- 0.035       
+[13.5, 14.0]    147     10.096 +or- 0.050       10.165 +or- 0.051       10.175 +or- 0.051       10.180 +or- 0.051       10.191 +or- 0.052       10.170 +or- 0.053       
+Note. Measurements of $\langle {M}_{{\rm{H}}{\rm{I}}}| {M}_{{\rm{h}}}\rangle $ for halos with different richness N_g. All masses are in units of ${h}^{-1}{M}_{\odot }$. The range of halo mass and total number of halos N_halo used in stacking of each mass bin for N_g >or= 1 are also displayed.

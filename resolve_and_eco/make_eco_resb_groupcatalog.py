@@ -15,8 +15,9 @@ import virtools as vz
 if __name__=='__main__':
     hubble_const = 70.
     ecovolume = 191958.08 / (hubble_const/100.)**3.
-    gfargseco = dict({'volume':ecovolume,'rproj_fit_multiplier':2.5,'vproj_fit_multiplier':3.5,'vproj_fit_offset':200,\
-           'gd_rproj_fit_multiplier':1.5, 'gd_vproj_fit_multiplier':3.5, 'gd_fit_bins':np.arange(-24,-19,0.25), 'gd_rproj_fit_guess':[1e-5, 0.4],\
+    gfargseco = dict({'volume':ecovolume,'rproj_fit_multiplier':3,'vproj_fit_multiplier':4,'vproj_fit_offset':200,\
+           'gd_rproj_fit_multiplier':2, 'gd_vproj_fit_multiplier':4, 'gd_vproj_fit_offset':100,\
+           'gd_fit_bins':np.arange(-24,-19,0.25), 'gd_rproj_fit_guess':[1e-5, 0.4],\
            'gd_vproj_fit_guess':[3e-5,4e-1], 'H0':hubble_const, 'iterative_giant_only_groups':True, 'ic_decision_mode':'centers'})
     ########################
     # Group Finding: ECO
@@ -129,8 +130,8 @@ if __name__=='__main__':
     resbgroupsel = (resolve.fl_insample==1.)&(resolve.f_b==1)
     tmpid = g3gf(resolve[resbgroupsel].radeg, resolve[resbgroupsel].dedeg, resolve[resbgroupsel].cz, resolve[resbgroupsel].absrmag, -19.5, fof_sep=resbana_fofsep,\
          rproj_fit_params=resbana_rproj_fit_params,vproj_fit_params=resbana_vproj_fit_params, gd_rproj_fit_params = resbana_gd_rproj_fit_params,\
-         gd_vproj_fit_params = resbana_gd_vproj_fit_params, rproj_fit_multiplier=2.5,vproj_fit_multiplier = 3.5, vproj_fit_offset=200, gd_rproj_fit_multiplier=1.5, gd_vproj_fit_multiplier=3.5,\
-         H0=hubble_const, iterative_giant_only_groups=True)[0]
+         gd_vproj_fit_params = resbana_gd_vproj_fit_params, rproj_fit_multiplier=3,vproj_fit_multiplier = 4, vproj_fit_offset=200, gd_rproj_fit_multiplier=2, gd_vproj_fit_multiplier=4,\
+         gd_vproj_fit_offset=100, H0=hubble_const, iterative_giant_only_groups=True)[0]
 
     resolveg3grpid[resbgroupsel] = tmpid
     resolveg3logmh[resbgroupsel] = mhspline(ic.get_int_mag(resolve[resbgroupsel].absrmag.to_numpy(), tmpid))

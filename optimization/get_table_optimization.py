@@ -116,12 +116,12 @@ if __name__=='__main__':
    
     if True: 
         # do grid serch
-        rproj_fit__candid = [3]#[1,2,3,4,5,6]#np.random.uniform(0.5,10,3)#[1,2.5,4]# [2.5,3,3.5]#[2,3,4]#[1,3,5,7]
-        vproj_fit__candid = [4]#[1,2,3,4,5,6]#np.random.uniform(0.5,10,3)# [2.5,3,3.5]#[2,3,4]#[1,3,5,7]
-        vproj_off__candid = [200]#[100,200,300]#[150,200,250]#[100,200,300,400]
-        gd_rproj_fit__candid = [10]#np.random.uniform(0.5,10,3)#[1.5,2,2.5]#[2,3,4]#[1,3,5,7]
-        gd_vproj_fit__candid = [10]#np.random.uniform(0.5,10,3)#[3.5,4,4.5]#[4,5,6]#[1,3,5,7]
-        gd_vproj_off__candid = [0]
+        rproj_fit__candid = [1,2,3,4,5,6]#np.random.uniform(0.5,10,3)#[1,2.5,4]# [2.5,3,3.5]#[2,3,4]#[1,3,5,7]
+        vproj_fit__candid = [1,2,3,4,5,6]#np.random.uniform(0.5,10,3)# [2.5,3,3.5]#[2,3,4]#[1,3,5,7]
+        vproj_off__candid = [100,200,300]#[150,200,250]#[100,200,300,400]
+        gd_rproj_fit__candid = [1,2,3,4,5,6]#np.random.uniform(0.5,10,3)#[1.5,2,2.5]#[2,3,4]#[1,3,5,7]
+        gd_vproj_fit__candid = [1,2,3,4,5,6]#np.random.uniform(0.5,10,3)#[3.5,4,4.5]#[4,5,6]#[1,3,5,7]
+        gd_vproj_off__candid = [0,100,200,300]
         candid=[]
         for R1 in rproj_fit__candid:
             for V1 in vproj_fit__candid:
@@ -146,7 +146,7 @@ if __name__=='__main__':
         scoredf = pd.DataFrame(scores,columns=['mu_HME','mu_HME_dyn','mu_HME_HAMngt7','P_G','C_G','P_H','C_H','mu_HME_dw','P_G_dw','C_G_dw','P_H_dw','C_H_dw',\
             'P_G_dwgt1','C_G_dwgt1','P_H_dwgt1','C_H_dwgt1','mu_HME_dwgt1','n_dwgroups','n_Ngt1dwgroups'])
         outdf = outdf.join(scoredf,how='outer')
-        outdf.to_csv("table_group_params_dw.csv",index=False)
+        outdf.to_csv("table_group_params.csv",index=False)
         print(outdf)
 
     #print(objective((1,3,200,1,3,0)))

@@ -39,12 +39,12 @@ if __name__=='__main__':
             scale=[]
             for fname in files:
                 mock = pd.read_csv(path+fname)
+                dens.append(len(mock)/192351./(0.7**3.))
                 myhalongal = fof.multiplicity_function(mock.haloid.to_numpy(),True)
                 mock=mock[mock.halo_ngal.to_numpy()==myhalongal]
                 mock = mock[(mock.g3grp_l>0)&(mock.g3logmh_l>0)]
                 dm = np.abs((mock.g3logmh_l+np.log10(0.7))-mock.loghalom)
                 print(currentsd,fname)
-                dens.append(len(mock)/192351./(0.7**3.))
                 scale.append(mad(dm))
 
                 mock = mock[mock.g3grpn_l>1]
@@ -54,7 +54,7 @@ if __name__=='__main__':
 
             dens,purity,comp,scale = zip(*sorted(zip(dens,purity,comp,scale)))
             xpos = np.arange(len(dens))
-            parts = axs[ii][jj].violinplot(purity, xpos, showextrema=False)
+            parts = axs[ii][jj].violinplot(purity, xpos, showextrema=False, widths=1)
             for pc in parts['bodies']:
                 pc.set_facecolor("None")
                 pc.set_facecolor("blue")
@@ -70,7 +70,7 @@ if __name__=='__main__':
             axs[ii][jj].scatter(xpos, [np.mean(xx) for xx in comp], marker='.', s=40, label=r'Mean ${C}_g$',color='darkorange')
             axs[ii][jj].scatter(xpos, [np.median(xx) for xx in comp], marker='s', s=40, label=r'Median ${C}_g$', edgecolor='darkorange', facecolor="None")
             axs[ii][jj].set_xticks(xpos,labels=["{:0.3f}".format(dd) for dd in dens],fontsize=8)
-            axs[ii][jj].set_ylim(0.75,1.02)
+            axs[ii][jj].set_ylim(0.4,1.02)
             #axs[ii][jj].set_xticklabels(["{:0.3f}".format(dd) for dd in dens])
             #dens,meanpurity,meancomp,l1norm,scale,medianpurity,mediancomp = zip(*sorted(zip(dens,meanpurity,meancomp,l1norm,scale,medianpurity,mediancomp)))
             #axs[ii][jj].axvline(12700/192351.,["{:0.3f}".format(dd) for dd in dens] color='k', alpha=0.6)

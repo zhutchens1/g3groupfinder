@@ -27,8 +27,8 @@ def make_mock_group_cat(filename):
     cz = mock.cz.to_numpy()
     absrmag = mock.M_r.to_numpy()
     ecovolume = 192351.
-    gfparams = dict({'volume':ecovolume,'rproj_fit_multiplier':2.5,'vproj_fit_multiplier':3.5,\
-       'vproj_fit_offset':200,'gd_rproj_fit_multiplier':1.5, 'gd_vproj_fit_multiplier':3.5,\
+    gfparams = dict({'volume':ecovolume,'rproj_fit_multiplier':3,'vproj_fit_multiplier':2,\
+       'vproj_fit_offset':400,'gd_rproj_fit_multiplier':2., 'gd_vproj_fit_multiplier':4, 'gd_vproj_fit_offset':100,\
        'gd_fit_bins':np.arange(-24,-19,0.25),\
        'gd_rproj_fit_guess':[1e-5, 0.4], 'gd_vproj_fit_guess':[3e-5,4e-1], 'H0':100.,\
        'iterative_giant_only_groups':True, 'ic_decision_mode':'centers','center_mode':'average'})
@@ -41,7 +41,8 @@ def make_mock_group_cat(filename):
     grpn = fof.multiplicity_function(grpid,return_by_galaxy=True)
     muHME = weighted_percentile(np.abs(np.array(g3logmh - mock.loghalom.to_numpy())), 1./grpn, 0.5)
     P_G, C_G = get_metrics_by_group(grpid, mock.haloid.to_numpy(), absrmag) 
-    P_H, C_H = get_metrics_by_halo(grpid, mock.haloid.to_numpy(), absrmag) 
+    P_H, C_H = get_metrics_by_halo(grpid, mock.haloid.to_numpy(), absrmag)
+    mhigrp = ic.get_int_mass(np.log10(mock.mhi.to_numpy()), grpid) 
     mock.loc[:,'g3grp_l']=grpid
     mock.loc[:,'g3grpn_l']=grpn
     mock.loc[:,'g3logmh_l']=g3logmh
@@ -50,6 +51,7 @@ def make_mock_group_cat(filename):
     mock.loc[:,'group_comp']=C_G
     mock.loc[:,'halo_purity']=P_H
     mock.loc[:,'halo_comp']=C_H
+    mock.loc[:,'g3grpmhi_l']=mhigrp
 
     # make mock FoF cat.
     fofe17id = fof.fast_fof(radeg,dedeg,cz,0.07,1.1,(ecovolume/len(radeg))**(1/3.))
@@ -63,7 +65,7 @@ def make_mock_group_cat(filename):
 
     P_G,C_G = get_metrics_by_group(fofe17id, mock.haloid.to_numpy(), absrmag)
     P_H,C_H = get_metrics_by_halo(fofe17id, mock.haloid.to_numpy(), absrmag)
-
+    mhigrp = ic.get_int_mass(np.log10(mock.mhi.to_numpy()), fofe17id)
     mock['fofe17id']=fofe17id
     mock['fofe17grpn']=fofe17grpn
     mock['fofe17logmh']=foflogmh
@@ -71,6 +73,7 @@ def make_mock_group_cat(filename):
     mock['fofe17completeness_g']=C_G
     mock['fofe17purity_h']=P_H
     mock['fofe17completeness_h']=C_H
+    mock['fofe17grpmhi']=mhigrp
 
     x = filename.split('/')
     outfile=x[0]+'/halobiasgroupcats/'+x[2]+'/'+x[3][:-5]+".csv"

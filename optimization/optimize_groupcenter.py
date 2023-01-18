@@ -10,8 +10,9 @@ from group_purity import get_metrics_by_group, get_metrics_by_halo
 from optimize_multipliers import weighted_percentile
 
 def get_score(radeg,dedeg,cz,absrmag,divide,truegroupID,trueloghalomass,halo_ngal,ecovolume,centermethod):
-    gfparams = dict({'volume':ecovolume,'rproj_fit_multiplier':2.5,'vproj_fit_multiplier':3.5,\
-           'vproj_fit_offset':200,'gd_rproj_fit_multiplier':1.5, 'gd_vproj_fit_multiplier':3.5,\
+    gfparams = dict({'volume':ecovolume,'rproj_fit_multiplier':3,'vproj_fit_multiplier':2,\
+           'vproj_fit_offset':400,'gd_rproj_fit_multiplier':6, 'gd_vproj_fit_multiplier':1,\
+           'gd_vproj_fit_offset':200,\
            'gd_fit_bins':np.arange(-24,-19,0.25),\
            'gd_rproj_fit_guess':[1e-5, 0.4], 'gd_vproj_fit_guess':[3e-5,4e-1], 'H0':100.,\
            'iterative_giant_only_groups':True, 'ic_decision_mode':'centers','center_mode':centermethod})
@@ -29,8 +30,13 @@ def get_score(radeg,dedeg,cz,absrmag,divide,truegroupID,trueloghalomass,halo_nga
     P_G, C_G = get_metrics_by_group(grpid[computesel], truegroupID[computesel], absrmag[computesel]) 
     P_H, C_H = get_metrics_by_halo(grpid[computesel], truegroupID[computesel], absrmag[computesel]) 
     score = 1 - (np.mean(P_G)*np.mean(C_G)*np.mean(P_H)*np.mean(C_H) - 2*muHME)
-    print(muHME, np.mean(P_G),np.mean(C_G),np.mean(P_H),np.mean(C_H))
-    return score
+    bygalaxydf = pd.DataFrame(np.array([grpid[computesel],truegroupID[computesel],P_G,C_G,P_H,C_H]).T,\
+        columns=['grpid','haloid','Pg','Cg','Ph','Ch'])
+    bygroupdf = bygalaxydf.groupby('grpid').first()
+    byhalodf = bygalaxydf.groupby('haloid').first()
+    print(muHME, np.mean(bygroupdf.Pg.to_numpy()),np.mean(bygroupdf.Cg.to_numpy()),np.mean(byhalodf.Ph.to_numpy()),\
+        np.mean(byhalodf.Ch.to_numpy()))
+    return 0
 
 
 if __name__=='__main__':

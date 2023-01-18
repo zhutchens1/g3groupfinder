@@ -26,12 +26,15 @@ from scipy.optimize import curve_fit
 def linmodel(x,a,b):
     return a*x+b
 
-def make_panel(cax,xv,yv,binvalues,xlim,ylim,xlab,ylab,ptcolor='gray',linecolor='k',ptalpha=0.3,fit=False):
-    cax.scatter(xv,yv,color=ptcolor,alpha=ptalpha,s=2)
+def hihalomodel(Mh, M0, Mmin, alpha):
+    return M0*((Mh/Mmin)**alpha)*np.exp(-1*Mmin/Mh)
+
+def make_panel(cax,xv,yv,binvalues,xlim,ylim,xlab,ylab,ptcolor='gray',linecolor='k',ptalpha=0.3,fit=False,fitguess=None):
+    #cax.scatter(xv,yv,color=ptcolor,alpha=ptalpha,s=2)
     median,bc,binedges,_ = cbs(xv, yv, 'median', bins=binvalues)
     medianerr = np.std(np.array([sbs(yv[np.where(np.logical_and(xv>binedges[i-1], xv<=binedges[i]))],\
-                       50, np.median, kwargs=dict({'axis':1})) for i in range(1,len(binedges))]), axis=1)
-    cax.errorbar(bc,median,yerr=medianerr,fmt='o-',color=linecolor,rasterized=True)
+                       1000, np.median, kwargs=dict({'axis':1})) for i in range(1,len(binedges))]), axis=1)
+    cax.errorbar(bc,median,yerr=medianerr,fmt='o-',color=linecolor,rasterized=True,markersize=2)
     #idx = np.argsort(xv)
     #xmed = median_filter(xv[idx],winsize)
     #ymed = median_filter(yv[idx],winsize)
@@ -41,14 +44,23 @@ def make_panel(cax,xv,yv,binvalues,xlim,ylim,xlab,ylab,ptcolor='gray',linecolor=
     cax.set_xlabel(xlab)
     cax.set_ylabel(ylab)
     if fit:
-        print('Linear fits to relation across thresh. scale:')
-        sel = (bc<=11.5)
-        popt,pcov = curve_fit(linmodel, bc[sel], median[sel])
-        perr = np.sqrt(np.diagonal(pcov))
-        print('below 11.5 (param,err): ', popt, perr)
-        popt,pcov = curve_fit(linmodel, bc[~sel], median[~sel])
-        perr = np.sqrt(np.diagonal(pcov))
-        print('above 11.5 (param,err): ', popt, perr)
+        print('fitting hi-halo model (M0, Mmin, alpha)')
+        popt,pcov = curve_fit(hihalomodel, 10**bc, 10**median, p0=[1.68916045e+09, 1.26981865e+11, 3.68640743e-01])
+        print('Best-fit params.: ', np.log10(popt[0]),np.log10(popt[1]),popt[2])
+        err=(np.sqrt(np.diagonal(pcov)))
+        print(np.log10(err[0]),np.log10(err[1]),err[2])
+        logtx = np.linspace(11,14.5,1000)
+        mhi_hat = hihalomodel(10**logtx,*popt)
+        cax.plot(logtx,np.log10(mhi_hat),'g',linewidth=3)
+    #else:
+    #    print('Linear fits to relation across thresh. scale:')
+    #    sel = (bc<=11.5)
+    #    popt,pcov = curve_fit(linmodel, bc[sel], median[sel])
+    #    perr = np.sqrt(np.diagonal(pcov))
+    #    print('below 11.5 (param,err): ', popt, perr)
+    #    popt,pcov = curve_fit(linmodel, bc[~sel], median[~sel])
+    #    perr = np.sqrt(np.diagonal(pcov))
+    #    print('above 11.5 (param,err): ', popt, perr)
     return cax
 
 if __name__=='__main__':
