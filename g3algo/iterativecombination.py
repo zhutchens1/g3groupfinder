@@ -59,7 +59,6 @@ def iterative_combination(galaxyra, galaxydec, galaxycz, galaxymag, rprojboundar
     niter=0
     while (not converged):
         print("iteration {} in progress...".format(niter))
-        print(np.average(itassocid))
         # Compute based on updated ID number
         olditassocid = itassocid
         itassocid = nearest_neighbor_assign(galaxyra, galaxydec, galaxycz, galaxymag, olditassocid, rprojboundary, vprojboundary, centermethod, decisionmode, H0=H0)
@@ -289,8 +288,6 @@ def fit_in_group(galra, galdec, galcz, galgrpid, galmag, rprojboundary, vprojbou
         seed2lossep = np.abs(seed2grpcz[0]-allgrpcz[0])
         fitingroup1 = (seed1radialsep<rprojboundary(memberintmag)).all() and (seed1lossep<vprojboundary(memberintmag)).all()
         fitingroup2 = (seed2radialsep<rprojboundary(memberintmag)).all() and (seed2lossep<vprojboundary(memberintmag)).all()
-        print('v: ',vprojboundary(memberintmag))
-        print('r: ',rprojboundary(memberintmag))
         fitingroup = fitingroup1 and fitingroup2
     else:
         assert False, "Function argument `decisionmode` must be either `allgalaxies` or `centers`."
