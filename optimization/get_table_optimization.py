@@ -45,6 +45,10 @@ def fast_grid_search(multsets,objective_fn):
     results = pool.map(objective_fn, multsets)
     return results
 
+def get_muHME_grp_med(Ei,grpid):
+    tmp = pd.DataFrame(np.array([Ei,grpid]).T,columns=['Ei','grp'])
+    return np.median(tmp.groupby('grp').median().Ei)
+
 def get_score(radeg,dedeg,cz,absrmag,divide,truegroupID,trueloghalomass,halo_ngal,ecovolume,rproj_fit_multiplier,\
               vproj_fit_multiplier,vproj_fit_offset,gd_rproj_fit_multiplier, gd_vproj_fit_multiplier, gd_vproj_fit_offset):
     gfparams = dict({'volume':ecovolume,'rproj_fit_multiplier':rproj_fit_multiplier,'vproj_fit_multiplier':vproj_fit_multiplier,\
@@ -64,12 +68,19 @@ def get_score(radeg,dedeg,cz,absrmag,divide,truegroupID,trueloghalomass,halo_nga
      
     my_halo_ngal = fof.multiplicity_function(truegroupID,True)
     computesel = (my_halo_ngal==halo_ngal)
-    muHME = weighted_percentile(np.abs(np.array(g3logmh[computesel] - loghalom[computesel])), weights[computesel], 0.5)
+    #muHME = weighted_percentile(np.abs(np.array(g3logmh[computesel] - loghalom[computesel])), weights[computesel], 0.5)
     P_G, C_G = get_metrics_by_group(grpid[computesel], truegroupID[computesel], absrmag[computesel]) 
     P_H, C_H = get_metrics_by_halo(grpid[computesel], truegroupID[computesel], absrmag[computesel])
     dynsel = computesel & (weights<1/7.)
-    muHMEdyn = weighted_percentile(np.abs(np.array(g3logmhdyn[dynsel] - loghalom[dynsel])), weights[dynsel], 0.5)
-    muHME_HAMhighN = weighted_percentile(np.abs(np.array(g3logmh[dynsel] - loghalom[dynsel])), weights[dynsel], 0.5)
+    #muHMEdyn = weighted_percentile(np.abs(np.array(g3logmhdyn[dynsel] - loghalom[dynsel])), weights[dynsel], 0.5)
+    #muHME_HAMhighN = weighted_percentile(np.abs(np.array(g3logmh[dynsel] - loghalom[dynsel])), weights[dynsel], 0.5)
+    muHMEdyn = get_muHME_grp_med(np.abs(np.array(g3logmhdyn[dynsel] - loghalom[dynsel])), grpid[dynsel])
+    muHME_HAMhighN = get_muHME_grp_med(np.abs(np.array(g3logmh[dynsel] - loghalom[dynsel])), grpid[dynsel])
+
+    Ei=np.abs(np.array(g3logmh[computesel] - loghalom[computesel]))
+    #muHME_simple_median = np.median(Ei)
+    muHME_grp_med = get_muHME_grp_med(Ei,grpid[computesel])
+
 
     # output statistics
     bygalaxydf = pd.DataFrame(np.array([grpid[computesel], P_G, C_G, P_H, C_H, g3logmh[computesel], grpn[computesel], absrmag[computesel], trueloghalomass[computesel], truegroupID[computesel]]).T,columns=['grpid','P_G','C_G','P_H','C_H','g3logmh','grpn', 'absrmag', 'loghalom', 'haloid'])
@@ -86,7 +97,8 @@ def get_score(radeg,dedeg,cz,absrmag,divide,truegroupID,trueloghalomass,halo_nga
     dwarfhalos_by_halo = dwarfgroups_by_gal.groupby('haloid').first()
     meanPhdw = np.mean(dwarfhalos_by_halo.P_H.to_numpy())
     meanChdw = np.mean(dwarfhalos_by_halo.C_H.to_numpy())
-    muHMEdw = weighted_percentile(np.abs(np.array(dwarfgroups_by_gal.g3logmh.to_numpy()-dwarfgroups_by_gal.loghalom.to_numpy())), 1/dwarfgroups_by_gal.grpn.to_numpy(), 0.5)
+    #muHMEdw=weighted_percentile(np.abs(np.array(dwarfgroups_by_gal.g3logmh.to_numpy()-dwarfgroups_by_gal.loghalom.to_numpy())), 1/dwarfgroups_by_gal.grpn.to_numpy(), 0.5)
+    muHMEdw = get_muHME_grp_med(np.abs(np.array(dwarfgroups_by_gal.g3logmh.to_numpy()-dwarfgroups_by_gal.loghalom.to_numpy())), dwarfgroups_by_gal.grpid.to_numpy())
     ngt1_dwgr_bygal = dwarfgroups_by_gal[dwarfgroups_by_gal.grpn>1]
     ngt1_dwgr_bygrp = ngt1_dwgr_bygal.groupby('grpid').first()
     ngt1_dwgr_byhalo = ngt1_dwgr_bygal.groupby('haloid').first()
@@ -95,10 +107,11 @@ def get_score(radeg,dedeg,cz,absrmag,divide,truegroupID,trueloghalomass,halo_nga
     meanCgdwgt1 = np.mean(ngt1_dwgr_bygrp.C_G.to_numpy())
     meanPhdwgt1 = np.mean(ngt1_dwgr_byhalo.P_H.to_numpy())
     meanChdwgt1 = np.mean(ngt1_dwgr_byhalo.C_H.to_numpy())
-    muHMEdwgt1 = weighted_percentile(np.abs(np.array(ngt1_dwgr_bygal.g3logmh.to_numpy()-ngt1_dwgr_bygal.loghalom.to_numpy())), 1/ngt1_dwgr_bygal.grpn.to_numpy(), 0.5)
+    #muHMEdwgt1 = weighted_percentile(np.abs(np.array(ngt1_dwgr_bygal.g3logmh.to_numpy()-ngt1_dwgr_bygal.loghalom.to_numpy())), 1/ngt1_dwgr_bygal.grpn.to_numpy(), 0.5)
+    muHMEdwgt1 = get_muHME_grp_med(np.abs(np.array(ngt1_dwgr_bygal.g3logmh.to_numpy()-ngt1_dwgr_bygal.loghalom.to_numpy())), ngt1_dwgr_bygal.grpid.to_numpy())
     Ndwarfgroups=len(dwarfgroups_by_grp)
     Ngt1dwarfgroups=len(ngt1_dwgr_bygrp)
-    return (muHME, muHMEdyn, muHME_HAMhighN, meanPg, meanCg, meanPh, meanCh, muHMEdw, meanPgdw, meanCgdw, meanPhdw, meanChdw, meanPgdwgt1, meanCgdwgt1, meanPhdwgt1, meanChdwgt1, muHMEdwgt1,Ndwarfgroups,Ngt1dwarfgroups) 
+    return (muHME_grp_med, muHMEdyn, muHME_HAMhighN, meanPg, meanCg, meanPh, meanCh, muHMEdw, meanPgdw, meanCgdw, meanPhdw, meanChdw, meanPgdwgt1, meanCgdwgt1, meanPhdwgt1, meanChdwgt1, muHMEdwgt1,Ndwarfgroups,Ngt1dwarfgroups) 
     #return (muHME,muHMEdyn, np.mean(P_G),np.mean(C_G),np.mean(P_H),np.mean(C_H))
 
 if __name__=='__main__':
@@ -117,11 +130,11 @@ if __name__=='__main__':
     if True: 
         # do grid serch
         rproj_fit__candid = [1,2,3,4,5,6]#np.random.uniform(0.5,10,3)#[1,2.5,4]# [2.5,3,3.5]#[2,3,4]#[1,3,5,7]
-        vproj_fit__candid = [1,2,3,4,5,6]#np.random.uniform(0.5,10,3)# [2.5,3,3.5]#[2,3,4]#[1,3,5,7]
-        vproj_off__candid = [100,200,300]#[150,200,250]#[100,200,300,400]
-        gd_rproj_fit__candid = [1,2,3,4,5,6]#np.random.uniform(0.5,10,3)#[1.5,2,2.5]#[2,3,4]#[1,3,5,7]
-        gd_vproj_fit__candid = [1,2,3,4,5,6]#np.random.uniform(0.5,10,3)#[3.5,4,4.5]#[4,5,6]#[1,3,5,7]
-        gd_vproj_off__candid = [0,100,200,300]
+        vproj_fit__candid = [4]#[1,2,3,4,5,6]#np.random.uniform(0.5,10,3)# [2.5,3,3.5]#[2,3,4]#[1,3,5,7]
+        vproj_off__candid = [200]#[100,200,300]#[150,200,250]#[100,200,300,400]
+        gd_rproj_fit__candid = [2]#[1,2,3,4,5,6]#np.random.uniform(0.5,10,3)#[1.5,2,2.5]#[2,3,4]#[1,3,5,7]
+        gd_vproj_fit__candid = [4]#[1,2,3,4,5,6]#np.random.uniform(0.5,10,3)#[3.5,4,4.5]#[4,5,6]#[1,3,5,7]
+        gd_vproj_off__candid = [100]#[0,100,200,300]
         candid=[]
         for R1 in rproj_fit__candid:
             for V1 in vproj_fit__candid:
