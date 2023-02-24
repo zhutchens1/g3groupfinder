@@ -819,6 +819,36 @@ def get_satint_mass(loggalmass, galgrpid, fc):
     for uid in np.unique(galgrpid):
         grpsel = np.where(galgrpid==uid)
         satsel = np.where((galgrpid==uid)&(fc<1))
-        print(grpsel, satsel)
+        #print(grpsel, satsel)
         satintmass[grpsel] = np.log10(np.sum(10**loggalmass[satsel]))
     return satintmass
+
+def get_rproj_czdisp_stierwalt(galaxyra,galaxydec,galaxycz,galaxygrpid,HUBBLE_CONST=70.):
+    """
+    compute group projected radius (max 2d distance at common z) and 3d sigma
+    as in stierwalt+2017 dwarf-only groups
+    """
+    galaxyra=np.asarray(galaxyra)
+    galaxydec=np.asarray(galaxydec)
+    galaxycz=np.asarray(galaxycz)
+    galaxygrpid=np.asarray(galaxygrpid)
+    rproj=np.zeros(len(galaxyra))
+    vdisp=np.zeros(len(galaxyra))
+    _, _, grpcz = group_skycoords(galaxyra, galaxydec, galaxycz, galaxygrpid)
+    uniqid = np.unique(galaxygrpid)
+    cspeed = 2.998e+5
+    for uid in uniqid:
+        sel = np.where(galaxygrpid==uid)
+        nmembers=len(sel[0])
+        if nmembers==1:
+            rproj[sel]=0.
+            vdisp[sel]=0.
+        else:
+            angsep_array = angular_separation(galaxyra[sel],galaxydec[sel],galaxyra[sel][:,None],galaxydec[sel][:,None])
+            maxangsep = np.max(angsep_array)
+            #rprojmax = (1/HUBBLE_CONST) * (2*grpcz[sel][0]) * np.sin(maxangsep/2.)
+            rprojmax = 2*(grpcz[sel][0]/HUBBLE_CONST) * np.tan(maxangsep/2.)
+            rproj[sel] = rprojmax
+            sig3d = 1.73205080757 * np.sqrt(np.average(galaxycz[sel]*galaxycz[sel]) - grpcz[sel][0]*grpcz[sel][0])
+            vdisp[sel] = sig3d
+    return rproj,vdisp

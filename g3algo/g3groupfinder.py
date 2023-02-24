@@ -199,9 +199,6 @@ def g3groupfinder_luminosity(radeg,dedeg,cz,absrmag,dwarfgiantdivide,fof_bperp=0
     
     rproj_boundary = lambda Ngiants: rproj_fit_multiplier*giantmodel(Ngiants, *rproj_bestfit)
     vproj_boundary = lambda Ngiants: vproj_fit_multiplier*giantmodel(Ngiants, *vproj_bestfit) + vproj_fit_offset
-    print('-----------------------')
-    print(rproj_boundary(2)) 
-    print('------------------------')
     ### if requested, merge giant-only FoF groups through iterative combination
     if iterative_giant_only_groups:
         revisedgiantgrpid = iterative_combination_giants(radeg[giantsel],dedeg[giantsel],cz[giantsel],giantfofid,rproj_boundary,vproj_boundary,ic_decision_mode,H0)

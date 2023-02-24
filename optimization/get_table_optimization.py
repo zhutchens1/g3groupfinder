@@ -65,6 +65,7 @@ def get_score(radeg,dedeg,cz,absrmag,divide,truegroupID,trueloghalomass,halo_nga
     g3logmhdyn = dynmass(radeg,dedeg,cz,grpid,Aval=9.9,h=1)
     grpn = fof.multiplicity_function(grpid,return_by_galaxy=True) 
     weights = 1./grpn#np.array((1/mockdf.ecog3grpn_l)/np.sum(1/mockdf.ecog3grpn_l))
+    g3logmhhybrid = (g3logmh)*(grpn<8).astype(int) + (g3logmhdyn)*(grpn>7).astype(int)
      
     my_halo_ngal = fof.multiplicity_function(truegroupID,True)
     computesel = (my_halo_ngal==halo_ngal)
@@ -76,11 +77,11 @@ def get_score(radeg,dedeg,cz,absrmag,divide,truegroupID,trueloghalomass,halo_nga
     #muHME_HAMhighN = weighted_percentile(np.abs(np.array(g3logmh[dynsel] - loghalom[dynsel])), weights[dynsel], 0.5)
     muHMEdyn = get_muHME_grp_med(np.abs(np.array(g3logmhdyn[dynsel] - loghalom[dynsel])), grpid[dynsel])
     muHME_HAMhighN = get_muHME_grp_med(np.abs(np.array(g3logmh[dynsel] - loghalom[dynsel])), grpid[dynsel])
-
+    
     Ei=np.abs(np.array(g3logmh[computesel] - loghalom[computesel]))
     #muHME_simple_median = np.median(Ei)
     muHME_grp_med = get_muHME_grp_med(Ei,grpid[computesel])
-
+    muHME_hybrid = get_muHME_grp_med(np.abs(np.array(g3logmhhybrid[computesel]-loghalom[computesel])),grpid[computesel])
 
     # output statistics
     bygalaxydf = pd.DataFrame(np.array([grpid[computesel], P_G, C_G, P_H, C_H, g3logmh[computesel], grpn[computesel], absrmag[computesel], trueloghalomass[computesel], truegroupID[computesel]]).T,columns=['grpid','P_G','C_G','P_H','C_H','g3logmh','grpn', 'absrmag', 'loghalom', 'haloid'])
@@ -111,7 +112,7 @@ def get_score(radeg,dedeg,cz,absrmag,divide,truegroupID,trueloghalomass,halo_nga
     muHMEdwgt1 = get_muHME_grp_med(np.abs(np.array(ngt1_dwgr_bygal.g3logmh.to_numpy()-ngt1_dwgr_bygal.loghalom.to_numpy())), ngt1_dwgr_bygal.grpid.to_numpy())
     Ndwarfgroups=len(dwarfgroups_by_grp)
     Ngt1dwarfgroups=len(ngt1_dwgr_bygrp)
-    return (muHME_grp_med, muHMEdyn, muHME_HAMhighN, meanPg, meanCg, meanPh, meanCh, muHMEdw, meanPgdw, meanCgdw, meanPhdw, meanChdw, meanPgdwgt1, meanCgdwgt1, meanPhdwgt1, meanChdwgt1, muHMEdwgt1,Ndwarfgroups,Ngt1dwarfgroups) 
+    return (muHME_grp_med, muHMEdyn, muHME_HAMhighN, muHME_hybrid, meanPg, meanCg, meanPh, meanCh, muHMEdw, meanPgdw, meanCgdw, meanPhdw, meanChdw, meanPgdwgt1, meanCgdwgt1, meanPhdwgt1, meanChdwgt1, muHMEdwgt1,Ndwarfgroups,Ngt1dwarfgroups) 
     #return (muHME,muHMEdyn, np.mean(P_G),np.mean(C_G),np.mean(P_H),np.mean(C_H))
 
 if __name__=='__main__':
@@ -156,7 +157,7 @@ if __name__=='__main__':
         print('done in {} seconds'.format(time.time()-ti))
 
         outdf = pd.DataFrame(candid,columns=['rproj_fit_mult','vproj_fit_mult','vproj_fit_offset','gd_rproj_fit_mult', 'gd_vproj_fit_mult', 'gd_vproj_fit_offset'])
-        scoredf = pd.DataFrame(scores,columns=['mu_HME','mu_HME_dyn','mu_HME_HAMngt7','P_G','C_G','P_H','C_H','mu_HME_dw','P_G_dw','C_G_dw','P_H_dw','C_H_dw',\
+        scoredf = pd.DataFrame(scores,columns=['mu_HME','mu_HME_dyn','mu_HME_HAMngt7','muHME_hybrid','P_G','C_G','P_H','C_H','mu_HME_dw','P_G_dw','C_G_dw','P_H_dw','C_H_dw',\
             'P_G_dwgt1','C_G_dwgt1','P_H_dwgt1','C_H_dwgt1','mu_HME_dwgt1','n_dwgroups','n_Ngt1dwgroups'])
         outdf = outdf.join(scoredf,how='outer')
         outdf.to_csv("table_group_params.csv",index=False)
