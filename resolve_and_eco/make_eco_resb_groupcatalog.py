@@ -27,15 +27,22 @@ if __name__=='__main__':
     ecogroupsel = (eco.absrmag<-17.33)
     eco.loc[:,'logmbary'] = np.log10(10**eco.logmstar+10**eco.logmgas)
     ecog3grpid = np.zeros(len(eco))-999.
-    output = g3gf(eco[ecogroupsel].radeg,eco[ecogroupsel].dedeg,eco[ecogroupsel].cz,eco[ecogroupsel].absrmag,-19.5,**gfargseco)
-    
-    tmpid = output[0]
-    ecog3grpid[ecogroupsel] = tmpid
-    eco.loc[:,'g3grp_l'] = ecog3grpid
+
+    # do g3 group finding with only galx. above floor to get best-fit params.
+    _, _, fof_sep_eco, rproj_best_fit_eco, _, vproj_best_fit_eco, _, gd_rproj_best_fit_eco, _, gd_vproj_best_fit_eco, _ = g3gf(eco[ecogroupsel].radeg, \
+        eco[ecogroupsel].dedeg,eco[ecogroupsel].cz,eco[ecogroupsel].absrmag,-19.5,**gfargseco)
+    # now re-do group finding using best-fit parameters for full ECO, so we can get group ID for all galaxies including those below floor.
+    output = g3gf(eco.radeg,eco.dedeg,eco.cz,eco.absrmag,-19.5,rproj_fit_params=rproj_best_fit_eco, vproj_fit_params=vproj_best_fit_eco,gd_rproj_fit_params=gd_rproj_best_fit_eco,\
+        gd_vproj_fit_params=gd_vproj_best_fit_eco, **gfargseco)
+
+    #tmpid = output[0] # commented these out on Feb 24 23; reworking code to include sub-Lr-floor galxs.
+    #ecog3grpid[ecogroupsel] = tmpid
+    eco.loc[:,'g3grp_l'] = output[0]
+    ecog3grpid = output[0]
     
     ecog3logmh = np.zeros_like(ecog3grpid)-999.
     ecog3logmh200 = np.zeros_like(ecog3grpid)-999.
-    ecohamsel = (ecog3grpid!=-999.)
+    ecohamsel = (eco.absrmag.to_numpy()<-17.33)#(ecog3grpid!=-999.) # this no longer works because g3grpid goes below floor.
     haloid, halomass, junk, junk = ic.HAMwrapper(eco.radeg[ecohamsel].to_numpy(), eco.dedeg[ecohamsel].to_numpy(), eco.cz[ecohamsel].to_numpy(),\
          eco.absrmag[ecohamsel].to_numpy(), eco.g3grp_l[ecohamsel].to_numpy(), ecovolume*(hubble_const/100.)**3., inputfilename=None, outputfilename=None)
     junk, uniqindex = np.unique(ecog3grpid[ecohamsel], return_index=True)
@@ -43,6 +50,7 @@ if __name__=='__main__':
     for i,idv in enumerate(haloid):
         sel = np.where(ecog3grpid==idv)
         ecog3logmh[sel] = halomass[i] # m337b
+    ecog3logmh[~ecohamsel]=-999.
 
     haloid200, halomass200, junk, junk = do_katie_HAM(eco.radeg[ecohamsel].to_numpy(), eco.dedeg[ecohamsel].to_numpy(), eco.cz[ecohamsel].to_numpy(),\
          eco.absrmag[ecohamsel].to_numpy(), eco.g3grp_l[ecohamsel].to_numpy(), ecovolume*(hubble_const/100.)**3., inputfilename=None, outputfilename=None)
@@ -51,25 +59,29 @@ if __name__=='__main__':
     for i,idv in enumerate(haloid200):
         sel = np.where(ecog3grpid==idv)
         ecog3logmh200[sel] = halomass200[i] # m337b
+    ecog3logmh200[~ecohamsel]=-999.
 
     eco.loc[:,'g3logmh_l'] = ecog3logmh
     eco.loc[:,'g3logmh200_l'] = ecog3logmh200
-    eco.loc[:,'g3grpabsrmag_l'] = ic.get_int_mag(eco.absrmag.to_numpy(),eco.g3grp_l.to_numpy())
-    eco.loc[:,'g3grplogG_l'] = ic.get_int_mass(eco.logmgas.to_numpy(),eco.g3grp_l.to_numpy())
-    eco.loc[:,'g3grplogS_l'] = ic.get_int_mass(eco.logmstar.to_numpy(),eco.g3grp_l.to_numpy())
-    eco.loc[:,'g3grplogB_l'] = ic.get_int_mass(eco.logmbary.to_numpy(),eco.g3grp_l.to_numpy())
-    eco.loc[:,'g3grpmhi_l'] = np.log10(10**eco.g3grplogG_l / 1.4)
-    ecogrpradeg,ecogrpdedeg,ecogrpcz = fof.group_skycoords(eco.radeg.to_numpy(),eco.dedeg.to_numpy(),eco.cz.to_numpy(),eco.g3grp_l.to_numpy())
-    eco.loc[:,'g3grpradeg_l'] = ecogrpradeg
-    eco.loc[:,'g3grpdedeg_l'] = ecogrpdedeg
-    eco.loc[:,'g3grpcz_l'] = ecogrpcz
-    eco.loc[:,'g3fc_l'] = fof.get_central_flag(eco.absrmag.to_numpy(), eco.g3grp_l.to_numpy())
-    eco.loc[:,'g3satmhi_l'] = fof.get_satint_mass(np.log10(10**eco.logmgas.to_numpy()/1.4), eco.g3grp_l.to_numpy(), eco.g3fc_l.to_numpy())
-    eco.loc[:,'g3cenmhi_l'] = fof.get_central_mass(np.log10(10**eco.logmgas.to_numpy()/1.4), eco.g3grp_l.to_numpy(), eco.g3fc_l.to_numpy())
-    ecog3grpngi=np.zeros_like(ecogrpradeg)
-    ecog3grpndw=np.zeros_like(ecogrpradeg)
+    # from here down, calculating group quantities and need to subselect galaxies that actually included in group quantities, i.e. Mr < -17.33
+    eco_grpproperty_sel = (eco.absrmag<-17.33)
+    eco.loc[eco_grpproperty_sel,'g3grpabsrmag_l'] = ic.get_int_mag(eco[eco_grpproperty_sel].absrmag.to_numpy(),eco[eco_grpproperty_sel].g3grp_l.to_numpy())
+    eco.loc[eco_grpproperty_sel,'g3grplogG_l'] = ic.get_int_mass(eco[eco_grpproperty_sel].logmgas.to_numpy(),eco[eco_grpproperty_sel].g3grp_l.to_numpy())
+    eco.loc[eco_grpproperty_sel,'g3grplogS_l'] = ic.get_int_mass(eco[eco_grpproperty_sel].logmstar.to_numpy(),eco[eco_grpproperty_sel].g3grp_l.to_numpy())
+    eco.loc[eco_grpproperty_sel,'g3grplogB_l'] = ic.get_int_mass(eco[eco_grpproperty_sel].logmbary.to_numpy(),eco[eco_grpproperty_sel].g3grp_l.to_numpy())
+    eco.loc[eco_grpproperty_sel,'g3grpmhi_l'] = np.log10(10**eco[eco_grpproperty_sel].g3grplogG_l / 1.4)
+    ecogrpradeg,ecogrpdedeg,ecogrpcz = fof.group_skycoords(eco[eco_grpproperty_sel].radeg.to_numpy(),eco[eco_grpproperty_sel].dedeg.to_numpy(),eco[eco_grpproperty_sel].cz.to_numpy(),\
+                                                           eco[eco_grpproperty_sel].g3grp_l.to_numpy())
+    eco.loc[eco_grpproperty_sel,'g3grpradeg_l'] = ecogrpradeg
+    eco.loc[eco_grpproperty_sel,'g3grpdedeg_l'] = ecogrpdedeg
+    eco.loc[eco_grpproperty_sel,'g3grpcz_l'] = ecogrpcz
+    eco.loc[eco_grpproperty_sel,'g3fc_l'] = fof.get_central_flag(eco[eco_grpproperty_sel].absrmag.to_numpy(), eco[eco_grpproperty_sel].g3grp_l.to_numpy())
+    eco.loc[eco_grpproperty_sel,'g3satmhi_l'] = fof.get_satint_mass(np.log10(10**eco[eco_grpproperty_sel].logmgas.to_numpy()/1.4), eco[eco_grpproperty_sel].g3grp_l.to_numpy(), eco[eco_grpproperty_sel].g3fc_l.to_numpy())
+    eco.loc[eco_grpproperty_sel,'g3cenmhi_l'] = fof.get_central_mass(np.log10(10**eco[eco_grpproperty_sel].logmgas.to_numpy()/1.4), eco[eco_grpproperty_sel].g3grp_l.to_numpy(), eco[eco_grpproperty_sel].g3fc_l.to_numpy())
+    ecog3grpngi=np.zeros_like(ecog3grpid)#(ecogrpradeg)
+    ecog3grpndw=np.zeros_like(ecog3grpid)#(ecogrpradeg)
     for uid in np.unique(ecog3grpid):
-        grpsel = np.where(ecog3grpid==uid)
+        grpsel = np.where(np.logical_and(ecog3grpid==uid,eco.absrmag.to_numpy()<-17.33))
         gisel = np.where(np.logical_and((ecog3grpid==uid),(eco.absrmag.to_numpy()<=-19.5)))
         dwsel = np.where(np.logical_and((ecog3grpid==uid),(eco.absrmag.to_numpy()>-19.5)))
         if len(gisel[0])>0:
@@ -78,17 +90,19 @@ if __name__=='__main__':
             ecog3grpndw[grpsel]=len(dwsel[0])
     eco.loc[:,'g3grpngi_l']=ecog3grpngi
     eco.loc[:,'g3grpndw_l']=ecog3grpndw
-    tmp=fof.dynmass(eco.radeg.to_numpy(),eco.dedeg.to_numpy(),eco.cz.to_numpy(),eco.g3grp_l.to_numpy(),9.9,hubble_const/100.)
-    tmp[(eco.g3grpngi_l+eco.g3grpndw_l)<=7]=-999.
-    eco.loc[:,'g3logmhdyn_l']=tmp
-    densoutput = lss_dens_by_galaxy(eco.g3grp_l.to_numpy(),eco.radeg.to_numpy(), eco.dedeg.to_numpy(), eco.cz.to_numpy(), eco.g3logmh_l.to_numpy(),\
-         Nnn=3, rarange=(130.05,237.45), decrange=(-1,50), czrange=(2530,7470))
-    eco.loc[:,'g3grpnndens_l']=densoutput[0]
-    eco.loc[:,'g3grpedgeflag_l']=densoutput[1]
-    eco.loc[:,'g3grpnndens2d_l']=densoutput[2]
-    eco.loc[:,'g3grpedgeflag2d_l']=densoutput[3]
-    eco.loc[:,'g3grpedgescale2d_l']=densoutput[4]
-    eco.loc[:,'g3grptcross_l']=vz.group_crossing_time(eco.radeg.to_numpy(), eco.dedeg.to_numpy(), eco.cz.to_numpy(),eco.g3grp_l.to_numpy(),H0=hubble_const)
+    tmp=fof.dynmass(eco[eco_grpproperty_sel].radeg.to_numpy(),eco[eco_grpproperty_sel].dedeg.to_numpy(),eco[eco_grpproperty_sel].cz.to_numpy(),\
+                    eco[eco_grpproperty_sel].g3grp_l.to_numpy(),9.9,hubble_const/100.)
+    tmp[(eco[eco_grpproperty_sel].g3grpngi_l+eco[eco_grpproperty_sel].g3grpndw_l)<=7]=-999.
+    eco.loc[eco_grpproperty_sel,'g3logmhdyn_l']=tmp
+    densoutput = lss_dens_by_galaxy(eco[eco_grpproperty_sel].g3grp_l.to_numpy(),eco[eco_grpproperty_sel].radeg.to_numpy(), eco[eco_grpproperty_sel].dedeg.to_numpy(), eco[eco_grpproperty_sel].cz.to_numpy(),\
+                eco[eco_grpproperty_sel].g3logmh_l.to_numpy(),Nnn=3, rarange=(130.05,237.45), decrange=(-1,50), czrange=(2530,7470))
+    eco.loc[eco_grpproperty_sel,'g3grpnndens_l']=densoutput[0]
+    eco.loc[eco_grpproperty_sel,'g3grpedgeflag_l']=densoutput[1]
+    eco.loc[eco_grpproperty_sel,'g3grpnndens2d_l']=densoutput[2]
+    eco.loc[eco_grpproperty_sel,'g3grpedgeflag2d_l']=densoutput[3]
+    eco.loc[eco_grpproperty_sel,'g3grpedgescale2d_l']=densoutput[4]
+    eco.loc[eco_grpproperty_sel,'g3grptcross_l']=vz.group_crossing_time(eco[eco_grpproperty_sel].radeg.to_numpy(), eco[eco_grpproperty_sel].dedeg.to_numpy(), eco[eco_grpproperty_sel].cz.to_numpy(),\
+                eco[eco_grpproperty_sel].g3grp_l.to_numpy(),H0=hubble_const)
 
     ccb_remapped = np.zeros(len(eco))+1.
     central_names = eco[(eco.fc>0)&(eco.ccb>1)].name.to_numpy()
@@ -99,29 +113,29 @@ if __name__=='__main__':
         ccb_remapped[sel]=ccb_vals[ii]
     eco.loc[:,'ccb_remapped']=ccb_remapped
     
-    nansel = (eco.g3grp_l<0)
-    eco.loc[nansel,'g3grplogG_l']=-999.
-    eco.loc[nansel,'g3grplogS_l']=-999.
-    eco.loc[nansel,'g3grplogB_l']=-999.
-    eco.loc[nansel,'g3grpabsrmag_l']=-999.
-    eco.loc[nansel,'g3grpmhi_l']=-999.
-    eco.loc[nansel,'g3satmhi_l']=-999.
-    eco.loc[nansel,'g3cenmhi_l']=-999.
-    eco.loc[nansel,'g3logmh_l']=-999.
-    eco.loc[nansel,'g3logmh200_l']=-999.
-    eco.loc[nansel,'g3grpradeg_l']=-999.
-    eco.loc[nansel,'g3grpdedeg_l']=-999.
-    eco.loc[nansel,'g3grpcz_l']=-999.
-    eco.loc[nansel,'g3fc_l']=-999.
-    eco.loc[nansel,'g3grpngi_l']=-999.
-    eco.loc[nansel,'g3grpndw_l']=-999.
-    eco.loc[nansel,'g3grpnndens_l']=-999.
-    eco.loc[nansel,'g3grpedgeflag_l']=-999.
-    eco.loc[nansel,'g3grpnndens2d_l']=-999.
-    eco.loc[nansel,'g3grpedgeflag2d_l']=-999.
-    eco.loc[nansel,'g3grpedgescale2d_l']=-999.
-    eco.loc[nansel,'g3grptcross_l']=-999.
-    eco.loc[nansel,'g3logmhdyn_l']=-999.
+    #nansel = (eco.g3grp_l<0)
+    eco.loc[~eco_grpproperty_sel,'g3grplogG_l']=-999.
+    eco.loc[~eco_grpproperty_sel,'g3grplogS_l']=-999.
+    eco.loc[~eco_grpproperty_sel,'g3grplogB_l']=-999.
+    eco.loc[~eco_grpproperty_sel,'g3grpabsrmag_l']=-999.
+    eco.loc[~eco_grpproperty_sel,'g3grpmhi_l']=-999.
+    eco.loc[~eco_grpproperty_sel,'g3satmhi_l']=-999.
+    eco.loc[~eco_grpproperty_sel,'g3cenmhi_l']=-999.
+    eco.loc[~eco_grpproperty_sel,'g3logmh_l']=-999.
+    eco.loc[~eco_grpproperty_sel,'g3logmh200_l']=-999.
+    eco.loc[~eco_grpproperty_sel,'g3grpradeg_l']=-999.
+    eco.loc[~eco_grpproperty_sel,'g3grpdedeg_l']=-999.
+    eco.loc[~eco_grpproperty_sel,'g3grpcz_l']=-999.
+    eco.loc[~eco_grpproperty_sel,'g3fc_l']=-999.
+    eco.loc[~eco_grpproperty_sel,'g3grpngi_l']=-999.
+    eco.loc[~eco_grpproperty_sel,'g3grpndw_l']=-999.
+    eco.loc[~eco_grpproperty_sel,'g3grpnndens_l']=-999.
+    eco.loc[~eco_grpproperty_sel,'g3grpedgeflag_l']=-999.
+    eco.loc[~eco_grpproperty_sel,'g3grpnndens2d_l']=-999.
+    eco.loc[~eco_grpproperty_sel,'g3grpedgeflag2d_l']=-999.
+    eco.loc[~eco_grpproperty_sel,'g3grpedgescale2d_l']=-999.
+    eco.loc[~eco_grpproperty_sel,'g3grptcross_l']=-999.
+    eco.loc[~eco_grpproperty_sel,'g3logmhdyn_l']=-999.
     eco.to_csv("ECOdata_G3catalog_luminosity.csv",index=False)
     ##########################
     # Group Finding: RESOLVE
@@ -167,15 +181,17 @@ if __name__=='__main__':
     resbana.to_csv("resbanalogue200.csv",index=False)
 
     # RESOLVE-B group finding
-    resbgroupsel = (resolve.absrmag<-17.)&(resolve.f_b==1) # fixed this on 2/19/23 - was using fl_insample (incorrect)
+    resbgroupsel = (resolve.f_b==1) #& (resolve.absrmag<-17.) # removed -17 cut to associate gals below floor # fixed this on 2/19/23 - was using fl_insample (incorrect)
     tmpid = g3gf(resolve[resbgroupsel].radeg, resolve[resbgroupsel].dedeg, resolve[resbgroupsel].cz, resolve[resbgroupsel].absrmag, -19.5, fof_sep=resbana_fofsep,\
          rproj_fit_params=resbana_rproj_fit_params,vproj_fit_params=resbana_vproj_fit_params, gd_rproj_fit_params = resbana_gd_rproj_fit_params,\
          gd_vproj_fit_params = resbana_gd_vproj_fit_params, rproj_fit_multiplier=3,vproj_fit_multiplier = 4, vproj_fit_offset=200, gd_rproj_fit_multiplier=2, gd_vproj_fit_multiplier=4,\
          gd_vproj_fit_offset=100, H0=hubble_const, iterative_giant_only_groups=True)[0]
 
     resolveg3grpid[resbgroupsel] = tmpid
-    resolveg3logmh[resbgroupsel] = mhspline(ic.get_int_mag(resolve[resbgroupsel].absrmag.to_numpy(), tmpid))
-    resolveg3logmh200[resbgroupsel] = mhspline200(ic.get_int_mag(resolve[resbgroupsel].absrmag.to_numpy(), tmpid))
+    # below this, need to adjust for galx gruop below floor
+    resbgrppropertysel = (resolve.f_b==1)&(resolve.absrmag<-17.)
+    resolveg3logmh[resbgrppropertysel] = mhspline(ic.get_int_mag(resolve[resbgrppropertysel].absrmag.to_numpy(), resolveg3grpid[resbgrppropertysel]))
+    resolveg3logmh200[resbgrppropertysel] = mhspline200(ic.get_int_mag(resolve[resbgrppropertysel].absrmag.to_numpy(), resolveg3grpid[resbgrppropertysel]))
     resolveg3grpradeg=np.zeros_like(resolveg3grpid)
     resolveg3grpdedeg=np.zeros_like(resolveg3grpid)
     resolveg3grpcz=np.zeros_like(resolveg3grpid)
@@ -184,58 +200,56 @@ if __name__=='__main__':
     resolveg3grplogB_l = np.zeros_like(resolveg3grpid)
     resolveg3grpabsrmag = np.zeros_like(resolveg3grpid)
     resolveg3fc = np.zeros_like(resolveg3grpid)
-    resolveg3grpabsrmag[resbgroupsel] = ic.get_int_mag(resolve[resbgroupsel].absrmag.to_numpy(), tmpid)
-    resolveg3grplogG_l[resbgroupsel] = ic.get_int_mass(resolve[resbgroupsel].logmgas.to_numpy(), tmpid)
-    resolveg3grplogS_l[resbgroupsel] = ic.get_int_mass(resolve[resbgroupsel].logmstar.to_numpy(), tmpid)
-    resolveg3grplogB_l[resbgroupsel] = ic.get_int_mass(resolve[resbgroupsel].logmbary.to_numpy(), tmpid)
-    resolveg3grpradeg[resbgroupsel],resolveg3grpdedeg[resbgroupsel],resolveg3grpcz[resbgroupsel]=fof.group_skycoords(resolve[resbgroupsel].radeg.to_numpy(),\
-        resolve[resbgroupsel].dedeg.to_numpy(), resolve[resbgroupsel].cz.to_numpy(), tmpid)
-    resolveg3fc[resbgroupsel] = fof.get_central_flag(resolve[resbgroupsel].absrmag.to_numpy(), tmpid)
+    resolveg3grpabsrmag[resbgrppropertysel] = ic.get_int_mag(resolve[resbgrppropertysel].absrmag.to_numpy(), resolveg3grpid[resbgrppropertysel])
+    resolveg3grplogG_l[resbgrppropertysel] = ic.get_int_mass(resolve[resbgrppropertysel].logmgas.to_numpy(), resolveg3grpid[resbgrppropertysel])
+    resolveg3grplogS_l[resbgrppropertysel] = ic.get_int_mass(resolve[resbgrppropertysel].logmstar.to_numpy(), resolveg3grpid[resbgrppropertysel])
+    resolveg3grplogB_l[resbgrppropertysel] = ic.get_int_mass(resolve[resbgrppropertysel].logmbary.to_numpy(), resolveg3grpid[resbgrppropertysel])
+
+    resolveg3grpradeg[resbgrppropertysel],resolveg3grpdedeg[resbgrppropertysel],resolveg3grpcz[resbgrppropertysel]=fof.group_skycoords(resolve[resbgrppropertysel].radeg.to_numpy(),\
+        resolve[resbgrppropertysel].dedeg.to_numpy(), resolve[resbgrppropertysel].cz.to_numpy(), resolveg3grpid[resbgrppropertysel])
+    resolveg3fc[resbgrppropertysel] = fof.get_central_flag(resolve[resbgrppropertysel].absrmag.to_numpy(), resolveg3grpid[resbgrppropertysel])
 
     resolveg3satmhi=np.zeros_like(resolveg3grpid)
     resolveg3cenmhi=np.zeros_like(resolveg3grpid)
-    resolveg3cenmhi[resbgroupsel] = fof.get_central_mass(np.log10(10**resolve[resbgroupsel].logmgas.to_numpy()/1.4), tmpid, resolveg3fc[resbgroupsel])
-    resolveg3satmhi[resbgroupsel] = fof.get_satint_mass(np.log10(10**resolve[resbgroupsel].logmgas.to_numpy()/1.4), tmpid, resolveg3fc[resbgroupsel])
-
+    resolveg3cenmhi[resbgrppropertysel] = fof.get_central_mass(np.log10(10**resolve[resbgrppropertysel].logmgas.to_numpy()/1.4), resolveg3grpid[resbgrppropertysel], resolveg3fc[resbgrppropertysel])
+    resolveg3satmhi[resbgrppropertysel] = fof.get_satint_mass(np.log10(10**resolve[resbgrppropertysel].logmgas.to_numpy()/1.4), resolveg3grpid[resbgrppropertysel], resolveg3fc[resbgrppropertysel])
     resolveg3grpngi = np.zeros_like(resolveg3grpid)
     resolveg3grpndw = np.zeros_like(resolveg3grpid)
-    resbg3grpngi = np.zeros_like(tmpid)
-    resbg3grpndw = np.zeros_like(tmpid)
+    resbg3grpngi = np.zeros_like(resolveg3grpid[resbgrppropertysel])
+    resbg3grpndw = np.zeros_like(resolveg3grpid[resbgrppropertysel])
     for uid in np.unique(tmpid):
-        grpsel = np.where(tmpid==uid)
-        gisel = np.where(np.logical_and((tmpid==uid),(resolve[resbgroupsel].absrmag.to_numpy()<=-19.5)))
-        dwsel = np.where(np.logical_and((tmpid==uid),(resolve[resbgroupsel].absrmag.to_numpy()>-19.5)))
+        grpsel = np.where(resolveg3grpid[resbgrppropertysel]==uid)
+        gisel = np.where(np.logical_and((resolveg3grpid[resbgrppropertysel]==uid),(resolve[resbgrppropertysel].absrmag.to_numpy()<=-19.5)))
+        dwsel = np.where(np.logical_and((resolveg3grpid[resbgrppropertysel]==uid),(resolve[resbgrppropertysel].absrmag.to_numpy()>-19.5)))
         if len(gisel[0])>0.:
             resbg3grpngi[grpsel]=len(gisel[0])
         if len(dwsel[0])>0.:
             resbg3grpndw[grpsel]=len(dwsel[0])
-    resolveg3grpngi[resbgroupsel]=resbg3grpngi
-    resolveg3grpndw[resbgroupsel]=resbg3grpndw
-
+    resolveg3grpngi[resbgrppropertysel]=resbg3grpngi
+    resolveg3grpndw[resbgrppropertysel]=resbg3grpndw
     resolveg3nndens=np.zeros_like(resolveg3grpid)
     resolveg3edgeflag=np.zeros_like(resolveg3grpid)
     resolveg3nndens2d=np.zeros_like(resolveg3grpid)
     resolveg3edgeflag2d=np.zeros_like(resolveg3grpid)
     resolveg3edgescale2d=np.zeros_like(resolveg3grpid)
-    RESB_RADEG_REMAPPED = np.copy(resolve[resbgroupsel].radeg.to_numpy())
+    RESB_RADEG_REMAPPED = np.copy(resolve[resbgrppropertysel].radeg.to_numpy())
     REMAPSEL = np.where(RESB_RADEG_REMAPPED>18*15.)
     RESB_RADEG_REMAPPED[REMAPSEL] = RESB_RADEG_REMAPPED[REMAPSEL]-360.
-    densoutput = lss_dens_by_galaxy(tmpid, RESB_RADEG_REMAPPED, resolve[resbgroupsel].dedeg.to_numpy(), resolve[resbgroupsel].cz.to_numpy(), resolveg3logmh[resbgroupsel],\
+    densoutput = lss_dens_by_galaxy(resolveg3grpid[resbgrppropertysel], RESB_RADEG_REMAPPED, resolve[resbgrppropertysel].dedeg.to_numpy(), resolve[resbgrppropertysel].cz.to_numpy(), resolveg3logmh[resbgrppropertysel],\
         Nnn=3, rarange=(-2*15.,3*15.), decrange=(-1.25,1.25), czrange=(4250,7250))
-    resolveg3nndens[resbgroupsel]=densoutput[0] 
-    resolveg3edgeflag[resbgroupsel]=densoutput[1] 
-    resolveg3nndens2d[resbgroupsel]=densoutput[2] 
-    resolveg3edgeflag2d[resbgroupsel]=densoutput[3] 
-    resolveg3edgescale2d[resbgroupsel]=densoutput[4] 
+    resolveg3nndens[resbgrppropertysel]=densoutput[0] 
+    resolveg3edgeflag[resbgrppropertysel]=densoutput[1] 
+    resolveg3nndens2d[resbgrppropertysel]=densoutput[2] 
+    resolveg3edgeflag2d[resbgrppropertysel]=densoutput[3] 
+    resolveg3edgescale2d[resbgrppropertysel]=densoutput[4]
     resolveg3grptcross=np.zeros_like(resolveg3grpid)
-    resolveg3grptcross[resbgroupsel]=vz.group_crossing_time(resolve[resbgroupsel].radeg.to_numpy(), resolve[resbgroupsel].dedeg.to_numpy(), resolve[resbgroupsel].cz.to_numpy(),\
-        tmpid, H0=hubble_const)    
+    resolveg3grptcross[resbgrppropertysel]=vz.group_crossing_time(resolve[resbgrppropertysel].radeg.to_numpy(), resolve[resbgrppropertysel].dedeg.to_numpy(), resolve[resbgrppropertysel].cz.to_numpy(),\
+        resolveg3grpid[resbgrppropertysel], H0=hubble_const)    
 
     resolveg3dynmass=np.zeros_like(resolveg3grpid)-999.
-    resbdynmass = fof.dynmass(resolve[resbgroupsel].radeg.to_numpy(), resolve[resbgroupsel].dedeg.to_numpy(), resolve[resbgroupsel].cz.to_numpy(),\
-        tmpid,9.9,hubble_const/100.)
-    resolveg3dynmass[resbgroupsel]=resbdynmass
-
+    resbdynmass = fof.dynmass(resolve[resbgrppropertysel].radeg.to_numpy(), resolve[resbgrppropertysel].dedeg.to_numpy(), resolve[resbgrppropertysel].cz.to_numpy(),\
+        resolveg3grpid[resbgrppropertysel],9.9,hubble_const/100.)
+    resolveg3dynmass[resbgrppropertysel]=resbdynmass
     # get RESOLVE-A from ECO
     resolvename = resolve.name.to_numpy()
     resname_in_eco = eco.resname.to_numpy()
@@ -290,4 +304,4 @@ if __name__=='__main__':
     resolve.loc[:,'g3grptcross_l']=resolveg3grptcross
     resolveg3dynmass[(resolveg3grpngi+resolveg3grpndw)<=7]=-999.
     resolve.loc[:,'g3logmhdyn_l']=resolveg3dynmass
-    resolve.to_csv("RESOLVEdata_G3catalog_luminosity.csv")
+    resolve.to_csv("RESOLVEdata_G3catalog_luminosity.csv",index=False)

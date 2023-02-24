@@ -271,11 +271,110 @@ def get_group_ind(matrix, active_row_num, visited):
 # -------------------------------------------------------------- #
 #  functions for galaxy association to existing groups
 # -------------------------------------------------------------- #
-
 def fast_faint_assoc(faintra, faintdec, faintcz, grpra, grpdec, grpcz, grpid, radius_boundary, velocity_boundary, losll=-1, H0=100., Om0=0.3, Ode0=0.7):
     """
     Associate galaxies to a group catalog based on given radius and velocity boundaries, based on a method
-    similar to that presented in Eckert+ 2016. 
+    similar to that presented in Eckert+ 2016. As used in Hutchens+2023 
+
+    Parameters
+    ----------
+    faintra : iterable
+        Right-ascension of faint galaxies in degrees.
+    faintdec : iterable
+        Declination of faint galaxies in degrees.
+    faintcz : iterable
+        Redhshift velocities of faint galaxies in km/s.
+    grpra : iterable
+        Right-ascension of group centers in degrees.
+    grpdec : iterable
+        Declination of group centers in degrees. Length matches `grpra`.
+    grpcz : iterable
+        Redshift velocity of group center in km/s. Length matches `grpra`.
+    grpid : iterable
+        group ID of each FoF group (i.e., from `foftools.fast_fof`.) Length matches `grpra`.
+    radius_boundary : iterable
+        Radius within which to search for faint galaxies around FoF groups. Length matches `grpra`.
+    velocity_boundary : iterable
+        Velocity from group center within which to search for faint galaxies around FoF groups. Length matches `grpra`.
+    losll : scalar, default -1
+         Line-of-sight linking length in km/s. If losll>0, then associations are made with the *larger of* the velocity
+         boundary of the LOS linking length. If losll=-1 (default), use only the velocity boundary to associate.
+
+    Returns
+    -------
+    assoc_grpid : iterable
+        group ID of every faint galaxy. Length matches `faintra`.
+    assoc_flag : iterable
+        association flag for every galaxy (see function description). Length matches `faintra`.
+    """
+    cosmo = LambdaCDM(H0=H0, Om0=Om0, Ode0=Ode0) # this puts everything in "per h" units.
+    velocity_boundary=np.asarray(velocity_boundary)
+    radius_boundary=np.asarray(radius_boundary)
+    Nfaint = len(faintra)
+    assoc_grpid = np.zeros(Nfaint).astype(int)
+    assoc_flag = np.zeros(Nfaint).astype(int)
+    r2plusv2=np.zeros(Nfaint)
+
+    # resize group coordinates to be the # of groups, not # galaxies
+    junk, uniqind = np.unique(grpid, return_index=True)
+    grpra = grpra[uniqind]
+    grpdec = grpdec[uniqind]
+    grpcz = grpcz[uniqind]
+    grpid = grpid[uniqind]
+    velocity_boundary=velocity_boundary[uniqind]
+    radius_boundary=radius_boundary[uniqind]
+
+    # Redefine velocity boundary array to take larger of (dV, linking length)
+    if losll>0:
+        velocity_boundary[np.where(velocity_boundary<=losll)]=losll
+
+    # Make Nfaints x Ngroups grids for transverse/LOS distances from group centers
+    faintphi = (faintra * np.pi/180.)[:,None]
+    fainttheta = (np.pi/2. - faintdec*(np.pi/180.))[:,None]
+    faint_cmvg = (cosmo.comoving_transverse_distance(faintcz/SPEED_OF_LIGHT).value)[:, None]
+    grpphi = (grpra * np.pi/180.)
+    grptheta = (np.pi/2. - grpdec*(np.pi/180.))
+    grp_cmvg = cosmo.comoving_transverse_distance(grpcz/SPEED_OF_LIGHT).value
+
+    half_angle = np.arcsin((np.sin((fainttheta-grptheta)/2.0)**2.0 + np.sin(fainttheta)*np.sin(grptheta)*np.sin((faintphi-grpphi)/2.0)**2.0)**0.5)
+    Rp = (faint_cmvg + grp_cmvg) * np.sin(half_angle)
+    DeltaV = np.abs(faintcz[:,None] - grpcz)
+
+    for gg in range(0,len(grpid)):
+        for fg in range(0,Nfaint):
+            tmpvalue = Rp[fg][gg]/radius_boundary[gg]*Rp[fg][gg]/radius_boundary[gg] + DeltaV[fg][gg]/velocity_boundary[gg]*DeltaV[fg][gg]/velocity_boundary[gg] 
+            condition=((Rp[fg][gg]<radius_boundary[gg]) and (DeltaV[fg][gg]<velocity_boundary[gg]))
+            # multiple groups competing (has already been associated before)
+            if condition and assoc_flag[fg]:
+                # multiple grps competing to associate galaxy
+                if tmpvalue<r2plusv2[fg]:
+                    r2plusv2[fg]=tmpvalue
+                    assoc_grpid[fg]=grpid[gg]
+                    assoc_flag[fg]=1
+                else:
+                    pass
+            # galaxy not associated yet - go ahead and do it
+            elif condition and (not assoc_flag[fg]):
+                r2plusv2[fg]=tmpvalue
+                assoc_grpid[fg]=grpid[gg]
+                assoc_flag[fg]=1
+            # condition not met
+            elif (not condition):
+                pass
+            else:
+                print("Galaxy failed association algorithm at index {}".format(fg))
+
+    # assign group ID numbers to galaxies that didn't associate
+    still_isolated = np.where(assoc_grpid==0)
+    assoc_grpid[still_isolated]=np.arange(np.max(grpid)+1, np.max(grpid)+1+len(still_isolated[0]), 1)
+    assoc_flag[still_isolated]=-1
+    return assoc_grpid, assoc_flag
+
+
+def fast_faint_assoc_E16(faintra, faintdec, faintcz, grpra, grpdec, grpcz, grpid, radius_boundary, velocity_boundary, losll=-1, H0=100., Om0=0.3, Ode0=0.7):
+    """
+    Associate galaxies to a group catalog based on given radius and velocity boundaries using method
+    from Eckert+2016 
 
     Parameters
     ----------
