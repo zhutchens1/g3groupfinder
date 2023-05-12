@@ -8,7 +8,7 @@ import matplotlib
 matplotlib.use('TkAgg')
 import matplotlib.pyplot as plt
 import pandas as pd
-from scipy.interpolate import interp1d
+from scipy.interpolate import interp1d, UnivariateSpline
 from lss_dens import lss_dens_by_galaxy
 import virtools as vz
 from replicate_fof_groups_katie import do_katie_HAM
@@ -23,8 +23,9 @@ if __name__=='__main__':
     ########################
     # Group Finding: ECO
     ########################
-    eco = pd.read_csv('ECOdata_080822.csv')
-    ecogroupsel = (eco.absrmag<-17.33)
+    eco = pd.read_csv('ECOdata_051123.csv')
+    eco = eco[eco.resname!='rs1492'] # removing rs1492
+    ecogroupsel = (eco.absrmag<=-17.33)
     eco.loc[:,'logmbary'] = np.log10(10**eco.logmstar+10**eco.logmgas)
     ecog3grpid = np.zeros(len(eco))-999.
 
@@ -42,7 +43,7 @@ if __name__=='__main__':
     
     ecog3logmh = np.zeros_like(ecog3grpid)-999.
     ecog3logmh200 = np.zeros_like(ecog3grpid)-999.
-    ecohamsel = (eco.absrmag.to_numpy()<-17.33)#(ecog3grpid!=-999.) # this no longer works because g3grpid goes below floor.
+    ecohamsel = (eco.absrmag.to_numpy()<=-17.33)#(ecog3grpid!=-999.) # this no longer works because g3grpid goes below floor.
     haloid, halomass, junk, junk = ic.HAMwrapper(eco.radeg[ecohamsel].to_numpy(), eco.dedeg[ecohamsel].to_numpy(), eco.cz[ecohamsel].to_numpy(),\
          eco.absrmag[ecohamsel].to_numpy(), eco.g3grp_l[ecohamsel].to_numpy(), ecovolume*(hubble_const/100.)**3., inputfilename=None, outputfilename=None)
     junk, uniqindex = np.unique(ecog3grpid[ecohamsel], return_index=True)
@@ -63,9 +64,13 @@ if __name__=='__main__':
 
     eco.loc[:,'g3logmh_l'] = ecog3logmh
     eco.loc[:,'g3logmh200_l'] = ecog3logmh200
+    
+
+    #
     # from here down, calculating group quantities and need to subselect galaxies that actually included in group quantities, i.e. Mr < -17.33
-    eco_grpproperty_sel = (eco.absrmag<-17.33)
+    eco_grpproperty_sel = (eco.absrmag<=-17.33)
     eco.loc[eco_grpproperty_sel,'g3grpabsrmag_l'] = ic.get_int_mag(eco[eco_grpproperty_sel].absrmag.to_numpy(),eco[eco_grpproperty_sel].g3grp_l.to_numpy())
+    eco.loc[eco_grpproperty_sel,'g3grpgiantabsrmag_l'] = ic.get_int_mag_giants(eco[eco_grpproperty_sel].absrmag.to_numpy(),eco[eco_grpproperty_sel].g3grp_l.to_numpy())
     eco.loc[eco_grpproperty_sel,'g3grplogG_l'] = ic.get_int_mass(eco[eco_grpproperty_sel].logmgas.to_numpy(),eco[eco_grpproperty_sel].g3grp_l.to_numpy())
     eco.loc[eco_grpproperty_sel,'g3grplogS_l'] = ic.get_int_mass(eco[eco_grpproperty_sel].logmstar.to_numpy(),eco[eco_grpproperty_sel].g3grp_l.to_numpy())
     eco.loc[eco_grpproperty_sel,'g3grplogB_l'] = ic.get_int_mass(eco[eco_grpproperty_sel].logmbary.to_numpy(),eco[eco_grpproperty_sel].g3grp_l.to_numpy())
@@ -81,7 +86,7 @@ if __name__=='__main__':
     ecog3grpngi=np.zeros_like(ecog3grpid)#(ecogrpradeg)
     ecog3grpndw=np.zeros_like(ecog3grpid)#(ecogrpradeg)
     for uid in np.unique(ecog3grpid):
-        grpsel = np.where(np.logical_and(ecog3grpid==uid,eco.absrmag.to_numpy()<-17.33))
+        grpsel = np.where(np.logical_and(ecog3grpid==uid,eco.absrmag.to_numpy()<=-17.33))
         gisel = np.where(np.logical_and((ecog3grpid==uid),(eco.absrmag.to_numpy()<=-19.5)))
         dwsel = np.where(np.logical_and((ecog3grpid==uid),(eco.absrmag.to_numpy()>-19.5)))
         if len(gisel[0])>0:
@@ -113,43 +118,112 @@ if __name__=='__main__':
         ccb_remapped[sel]=ccb_vals[ii]
     eco.loc[:,'ccb_remapped']=ccb_remapped
     
-    #nansel = (eco.g3grp_l<0)
-    eco.loc[~eco_grpproperty_sel,'g3grplogG_l']=-999.
-    eco.loc[~eco_grpproperty_sel,'g3grplogS_l']=-999.
-    eco.loc[~eco_grpproperty_sel,'g3grplogB_l']=-999.
-    eco.loc[~eco_grpproperty_sel,'g3grpabsrmag_l']=-999.
-    eco.loc[~eco_grpproperty_sel,'g3grpmhi_l']=-999.
-    eco.loc[~eco_grpproperty_sel,'g3satmhi_l']=-999.
-    eco.loc[~eco_grpproperty_sel,'g3cenmhi_l']=-999.
-    eco.loc[~eco_grpproperty_sel,'g3logmh_l']=-999.
-    eco.loc[~eco_grpproperty_sel,'g3logmh200_l']=-999.
-    eco.loc[~eco_grpproperty_sel,'g3grpradeg_l']=-999.
-    eco.loc[~eco_grpproperty_sel,'g3grpdedeg_l']=-999.
-    eco.loc[~eco_grpproperty_sel,'g3grpcz_l']=-999.
-    eco.loc[~eco_grpproperty_sel,'g3fc_l']=-999.
-    eco.loc[~eco_grpproperty_sel,'g3grpngi_l']=-999.
-    eco.loc[~eco_grpproperty_sel,'g3grpndw_l']=-999.
-    eco.loc[~eco_grpproperty_sel,'g3grpnndens_l']=-999.
-    eco.loc[~eco_grpproperty_sel,'g3grpedgeflag_l']=-999.
-    eco.loc[~eco_grpproperty_sel,'g3grpnndens2d_l']=-999.
-    eco.loc[~eco_grpproperty_sel,'g3grpedgeflag2d_l']=-999.
-    eco.loc[~eco_grpproperty_sel,'g3grpedgescale2d_l']=-999.
-    eco.loc[~eco_grpproperty_sel,'g3grptcross_l']=-999.
-    eco.loc[~eco_grpproperty_sel,'g3logmhdyn_l']=-999.
+    # make splines for halo mass extrapolation
+    tmp = eco[eco.g3logmh_l>0].groupby('g3grp_l').first()
+    tmp = tmp[['g3grpabsrmag_l','g3logmh_l','g3logmh200_l']]
+    tmp = tmp[tmp.g3grpabsrmag_l>-19.5].sort_values(by='g3grpabsrmag_l')
+    tmp = tmp.tail(100)
+    params=np.polyfit(tmp.g3grpabsrmag_l,tmp.g3logmh_l,1)
+    params200=np.polyfit(tmp.g3grpabsrmag_l,tmp.g3logmh200_l,1)
+    mhspline_eco = lambda Mrtot: np.polyval(params,Mrtot)#UnivariateSpline(tmp.g3grpabsrmag_l,tmp.g3logmh_l,s=0.8)
+    mhspline200_eco = lambda Mrtot: np.polyval(params200,Mrtot)#UnivariateSpline(tmp.g3grpabsrmag_l,tmp.g3logmh200_l,s=0.8)
+    plt.figure()
+    plt.plot(tmp.g3grpabsrmag_l,tmp.g3logmh_l,'o',color='palegreen',label='337')
+    plt.plot(tmp.g3grpabsrmag_l,tmp.g3logmh200_l,'.',color='k',label='200',markersize=2)
+    tx=np.linspace(-26,-15,1000)
+    plt.plot(tx,mhspline200_eco(tx),'k-')
+    plt.title("HAM curve for ECO")
+    plt.legend(loc='best')
+    plt.gca().invert_xaxis()
+    plt.show()
+    # now, for each subfloor galaxy that was excluded from group finding need, to add group quantity
+    # which is itself calculated based on above-floor galaxies only.
+    for subfloorname,grpidvalue in zip(eco[~eco_grpproperty_sel].name.to_numpy(), eco[~eco_grpproperty_sel].g3grp_l.to_numpy()):
+        fillsel = (eco.name==subfloorname)
+        grpsel = (eco.g3grp_l==grpidvalue)&(eco.absrmag<=-17.33)
+        if np.sum(grpsel)>0:
+            eco.loc[fillsel,'g3grplogG_l']=np.mean(eco.loc[grpsel,'g3grplogG_l'])
+            eco.loc[fillsel,'g3grplogS_l']=np.mean(eco.loc[grpsel,'g3grplogS_l'])
+            eco.loc[fillsel,'g3grplogB_l']=np.mean(eco.loc[grpsel,'g3grplogB_l'])
+            eco.loc[fillsel,'g3grpabsrmag_l']=np.mean(eco.loc[grpsel,'g3grpabsrmag_l'])
+            eco.loc[fillsel,'g3grpgiantabsrmag_l']=np.mean(eco.loc[grpsel,'g3grpgiantabsrmag_l'])
+            eco.loc[fillsel,'g3grpmhi_l']=np.mean(eco.loc[grpsel,'g3grpmhi_l'])
+            eco.loc[fillsel,'g3satmhi_l']=np.mean(eco.loc[grpsel,'g3satmhi_l'])
+            eco.loc[fillsel,'g3cenmhi_l']=np.mean(eco.loc[grpsel,'g3cenmhi_l'])
+            eco.loc[fillsel,'g3logmh_l']=np.mean(eco.loc[grpsel,'g3logmh_l'])
+            eco.loc[fillsel,'g3logmh200_l']=np.mean(eco.loc[grpsel,'g3logmh200_l'])
+            eco.loc[fillsel,'g3grpradeg_l']=np.mean(eco.loc[grpsel,'g3grpradeg_l'])
+            eco.loc[fillsel,'g3grpdedeg_l']=np.mean(eco.loc[grpsel,'g3grpdedeg_l'])
+            eco.loc[fillsel,'g3grpcz_l']=np.mean(eco.loc[grpsel,'g3grpcz_l'])
+            eco.loc[fillsel,'g3fc_l']=np.mean(eco.loc[grpsel,'g3fc_l'])
+            eco.loc[fillsel,'g3grpngi_l']=np.mean(eco.loc[grpsel,'g3grpngi_l'])
+            eco.loc[fillsel,'g3grpndw_l']=np.mean(eco.loc[grpsel,'g3grpndw_l'])
+            eco.loc[fillsel,'g3grpnndens_l']=np.mean(eco.loc[grpsel,'g3grpnndens_l'])
+            eco.loc[fillsel,'g3grpedgeflag_l']=np.mean(eco.loc[grpsel,'g3grpedgeflag_l'])
+            eco.loc[fillsel,'g3grpnndens2d_l']=np.mean(eco.loc[grpsel,'g3grpnndens2d_l'])
+            eco.loc[fillsel,'g3grpedgeflag2d_l']=np.mean(eco.loc[grpsel,'g3grpedgeflag2d_l'])
+            eco.loc[fillsel,'g3grpedgescale2d_l']=np.mean(eco.loc[grpsel,'g3grpedgescale2d_l'])
+            eco.loc[fillsel,'g3grptcross_l']=np.mean(eco.loc[grpsel,'g3grptcross_l'])
+        else:
+            # this means isolated dwarf galaxy below floor
+            eco.loc[fillsel,'g3grplogG_l'] = eco.loc[fillsel,'logmgas']
+            eco.loc[fillsel,'g3grplogS_l']= eco.loc[fillsel,'logmstar']
+            eco.loc[fillsel,'g3grplogB_l']= eco.loc[fillsel,'logmbary']
+            eco.loc[fillsel,'g3grpabsrmag_l'] = eco.loc[fillsel,'absrmag']
+            eco.loc[fillsel,'g3grpgiantabsrmag_l'] = -999.
+            eco.loc[fillsel,'g3grpmhi_l'] = np.log10(10**eco.loc[fillsel,'logmgas']/1.4)
+            eco.loc[fillsel,'g3satmhi_l']= 0.
+            eco.loc[fillsel,'g3cenmhi_l']= np.log10(10**eco.loc[fillsel,'logmgas']/1.4)
+            eco.loc[fillsel,'g3logmh_l']= mhspline_eco(eco.loc[fillsel,'absrmag']) # extrapolate down curve
+            eco.loc[fillsel,'g3logmh200_l']= mhspline200_eco(eco.loc[fillsel,'absrmag']) # extrapolate down curve
+            eco.loc[fillsel,'g3grpradeg_l'] = eco.loc[fillsel,'radeg']
+            eco.loc[fillsel,'g3grpdedeg_l'] = eco.loc[fillsel,'dedeg']
+            eco.loc[fillsel,'g3grpcz_l'] = eco.loc[fillsel,'cz']
+            eco.loc[fillsel,'g3fc_l']= 1.
+            eco.loc[fillsel,'g3grpngi_l']= 0
+            eco.loc[fillsel,'g3grpndw_l']= 1
+            eco.loc[fillsel,'g3grpnndens_l']= -999.
+            eco.loc[fillsel,'g3grpedgeflag_l']= -999.
+            eco.loc[fillsel,'g3grpnndens2d_l']= -999.
+            eco.loc[fillsel,'g3grpedgeflag2d_l']= -999.
+    #eco.loc[~eco_grpproperty_sel,'g3grplogG_l']=-999.
+    #eco.loc[~eco_grpproperty_sel,'g3grplogS_l']=-999.
+    #eco.loc[~eco_grpproperty_sel,'g3grplogB_l']=-999.
+    #eco.loc[~eco_grpproperty_sel,'g3grpabsrmag_l']=-999.
+    #eco.loc[~eco_grpproperty_sel,'g3grpgiantabsrmag_l']=-999.
+    #eco.loc[~eco_grpproperty_sel,'g3grpmhi_l']=-999.
+    #eco.loc[~eco_grpproperty_sel,'g3satmhi_l']=-999.
+    #eco.loc[~eco_grpproperty_sel,'g3cenmhi_l']=-999.
+    #eco.loc[~eco_grpproperty_sel,'g3logmh_l']=-999.
+    #eco.loc[~eco_grpproperty_sel,'g3logmh200_l']=-999.
+    #eco.loc[~eco_grpproperty_sel,'g3grpradeg_l']=-999.
+    #eco.loc[~eco_grpproperty_sel,'g3grpdedeg_l']=-999.
+    #eco.loc[~eco_grpproperty_sel,'g3grpcz_l']=-999.
+    #eco.loc[~eco_grpproperty_sel,'g3fc_l']=-999.
+    #eco.loc[~eco_grpproperty_sel,'g3grpngi_l']=-999.
+    #eco.loc[~eco_grpproperty_sel,'g3grpndw_l']=-999.
+    #eco.loc[~eco_grpproperty_sel,'g3grpnndens_l']=-999.
+    #eco.loc[~eco_grpproperty_sel,'g3grpedgeflag_l']=-999.
+    #eco.loc[~eco_grpproperty_sel,'g3grpnndens2d_l']=-999.
+    #eco.loc[~eco_grpproperty_sel,'g3grpedgeflag2d_l']=-999.
+    #eco.loc[~eco_grpproperty_sel,'g3grpedgescale2d_l']=-999.
+    #eco.loc[~eco_grpproperty_sel,'g3grptcross_l']=-999.
+    #eco.loc[~eco_grpproperty_sel,'g3logmhdyn_l']=-999.
     eco.to_csv("ECOdata_G3catalog_luminosity.csv",index=False)
     ##########################
     # Group Finding: RESOLVE
     ##########################
-    resolve = pd.read_csv('RESOLVEdata_080822.csv')
+    resolve = pd.read_csv('/srv/two/cielo/zhutchen/database/add_rs1519_resolve/RESOLVE_preupload_051123.csv')
+    resolve = resolve[resolve.name!='rs1492'] # remove rs1492
+    print('currently using pre-upload version of RESOLVE 5/11/2023!')
     resolve.loc[:,'logmbary']=np.log10(10**resolve.logmstar+10**resolve.logmgas)
     resolveg3grpid=np.zeros(len(resolve))-999.
     resolveg3logmh=np.zeros(len(resolve))-999.
     resolveg3logmh200=np.zeros(len(resolve))-999.
     # RESOLVE-B analogue group finding + HAM
     resbana = pd.read_csv("ECOdata_080822.csv")
-    resbana=resbana[(resbana.absrmag<-17.0)]
+    resbana=resbana[(resbana.absrmag<=-17.0)]
     resbanag3grpid, _, resbana_fofsep, resbana_rproj_fit_params, _, resbana_vproj_fit_params, _, resbana_gd_rproj_fit_params, _, resbana_gd_vproj_fit_params, _ = g3gf(resbana.radeg,resbana.dedeg, resbana.cz, resbana.absrmag,-19.5, **gfargseco)
-    print(resbana_fofsep)
     resbana.loc[:,'g3grp_l'] = resbanag3grpid
     resbanag3logmh = np.zeros_like(resbanag3grpid)-999.
     resbanag3logmh200 = np.zeros_like(resbanag3grpid)-999.
@@ -163,8 +237,15 @@ if __name__=='__main__':
         resbanag3logmh[sel] = halomass[i] # m337b
     resbana.loc[:,'g3logmh_l'] = resbanag3logmh
     resbanaintmag = ic.get_int_mag(resbana.absrmag.to_numpy(),resbana.g3grp_l.to_numpy())
-    mhspline = interp1d(resbanaintmag,resbanag3logmh)
+    resbanagiantintmag = ic.get_int_mag_giants(resbana.absrmag.to_numpy(),resbana.g3grp_l.to_numpy())
+    _,uniqidx=np.unique(resbana.g3grp_l.to_numpy(),return_index=True)
+    mhspline = interp1d(resbanaintmag[uniqidx],resbanag3logmh[uniqidx])
+    tmp = pd.DataFrame(np.array([resbanaintmag[uniqidx],resbanag3logmh[uniqidx]]).T,columns=['grprmag','logmh']).sort_values(by='grprmag')
+    tmp = tmp[tmp.grprmag>-19.5].tail(100)
+    params_ = np.polyfit(tmp.grprmag,tmp.logmh,1)
+    mhsplineEXTRAP = lambda Mrtot: np.polyval(params_, Mrtot)#UnivariateSpline(tmp.grprmag,tmp.logmh,s=0.8*len(tmp))
     resbana.loc[:,'g3grpabsrmag_l'] = resbanaintmag
+    resbana.loc[:,'g3grpgiantabsrmag_l'] = resbanagiantintmag
     resbana.to_csv("resbanalogue.csv",index=False)
 
     haloid200, halomass200, junk, junk = do_katie_HAM(resbana.radeg[resbanahamsel].to_numpy(), resbana.dedeg[resbanahamsel].to_numpy(), resbana.cz[resbanahamsel].to_numpy(),\
@@ -176,9 +257,20 @@ if __name__=='__main__':
         resbanag3logmh200[sel] = halomass200[i] # m337b
     resbana.loc[:,'g3logmh200_l'] = resbanag3logmh200
     resbanaintmag = ic.get_int_mag(resbana.absrmag.to_numpy(),resbana.g3grp_l.to_numpy())
-    mhspline200 = interp1d(resbanaintmag,resbanag3logmh200)
-    resbana.loc[:,'g3grpabsrmag_l'] = resbanaintmag
+    _,uniqidx=np.unique(resbana.g3grp_l.to_numpy(),return_index=True)
+    mhspline200 = interp1d(resbanaintmag[uniqidx],resbanag3logmh200[uniqidx])
+    tmp = pd.DataFrame(np.array([resbanaintmag[uniqidx],resbanag3logmh200[uniqidx]]).T,columns=['grprmag','logmh200']).sort_values(by='grprmag')
+    tmp = tmp[tmp.grprmag>-19.5].tail(100)
+    params200_ = np.polyfit(tmp.grprmag,tmp.logmh200,1)
+    mhsplineEXTRAP200 = lambda Mrtot: np.polyval(params200_, Mrtot)#UnivariateSpline(tmp.grprmag,tmp.logmh200,s=0.8*len(tmp))
     resbana.to_csv("resbanalogue200.csv",index=False)
+    
+    plt.figure()
+    tx=np.linspace(-25,-15,1000)
+    plt.plot(tmp.grprmag,tmp.logmh200,'k.')
+    plt.plot(tx,mhsplineEXTRAP200(tx),'k-')
+    plt.title("RESOLVE curve")
+    plt.show()
 
     # RESOLVE-B group finding
     resbgroupsel = (resolve.f_b==1) #& (resolve.absrmag<-17.) # removed -17 cut to associate gals below floor # fixed this on 2/19/23 - was using fl_insample (incorrect)
@@ -189,7 +281,7 @@ if __name__=='__main__':
 
     resolveg3grpid[resbgroupsel] = tmpid
     # below this, need to adjust for galx gruop below floor
-    resbgrppropertysel = (resolve.f_b==1)&(resolve.absrmag<-17.)
+    resbgrppropertysel = (resolve.f_b==1)&(resolve.absrmag<=-17.)
     resolveg3logmh[resbgrppropertysel] = mhspline(ic.get_int_mag(resolve[resbgrppropertysel].absrmag.to_numpy(), resolveg3grpid[resbgrppropertysel]))
     resolveg3logmh200[resbgrppropertysel] = mhspline200(ic.get_int_mag(resolve[resbgrppropertysel].absrmag.to_numpy(), resolveg3grpid[resbgrppropertysel]))
     resolveg3grpradeg=np.zeros_like(resolveg3grpid)
@@ -199,8 +291,10 @@ if __name__=='__main__':
     resolveg3grplogS_l = np.zeros_like(resolveg3grpid)
     resolveg3grplogB_l = np.zeros_like(resolveg3grpid)
     resolveg3grpabsrmag = np.zeros_like(resolveg3grpid)
+    resolveg3grpgiantabsrmag = np.zeros_like(resolveg3grpid)
     resolveg3fc = np.zeros_like(resolveg3grpid)
     resolveg3grpabsrmag[resbgrppropertysel] = ic.get_int_mag(resolve[resbgrppropertysel].absrmag.to_numpy(), resolveg3grpid[resbgrppropertysel])
+    resolveg3grpgiantabsrmag[resbgrppropertysel] = ic.get_int_mag_giants(resolve[resbgrppropertysel].absrmag.to_numpy(), resolveg3grpid[resbgrppropertysel])
     resolveg3grplogG_l[resbgrppropertysel] = ic.get_int_mass(resolve[resbgrppropertysel].logmgas.to_numpy(), resolveg3grpid[resbgrppropertysel])
     resolveg3grplogS_l[resbgrppropertysel] = ic.get_int_mass(resolve[resbgrppropertysel].logmstar.to_numpy(), resolveg3grpid[resbgrppropertysel])
     resolveg3grplogB_l[resbgrppropertysel] = ic.get_int_mass(resolve[resbgrppropertysel].logmbary.to_numpy(), resolveg3grpid[resbgrppropertysel])
@@ -267,6 +361,7 @@ if __name__=='__main__':
             resolveg3grplogS_l[ii]=eco.g3grplogS_l[ecosel]
             resolveg3grplogB_l[ii]=eco.g3grplogB_l[ecosel]
             resolveg3grpabsrmag[ii]=eco.g3grpabsrmag_l[ecosel]
+            resolveg3grpgiantabsrmag[ii]=eco.g3grpgiantabsrmag_l[ecosel]
             resolveg3fc[ii]=eco.g3fc_l[ecosel]
             resolveg3grpngi[ii]=eco.g3grpngi_l[ecosel]
             resolveg3grpndw[ii]=eco.g3grpndw_l[ecosel]
@@ -286,10 +381,11 @@ if __name__=='__main__':
     resolve.loc[:,'g3grplogS_l']=resolveg3grplogS_l
     resolve.loc[:,'g3grplogB_l']=resolveg3grplogB_l
     resolve.loc[:,'g3grpabsrmag_l']=resolveg3grpabsrmag
+    resolve.loc[:,'g3grpgiantabsrmag_l']=resolveg3grpgiantabsrmag
     resolve.loc[:,'g3grpmhi_l']=np.log10(10**resolveg3grplogG_l/1.4)
     resolve.loc[(resolve.g3grp_l==-999.),'g3grpmhi_l']=-999.
-    resolve.loc[:,'g3cenmhi']=resolveg3cenmhi
-    resolve.loc[:,'g3satmhi']=resolveg3satmhi
+    resolve.loc[:,'g3cenmhi_l']=resolveg3cenmhi
+    resolve.loc[:,'g3satmhi_l']=resolveg3satmhi
     resolve.loc[:,'g3grpradeg_l']=resolveg3grpradeg
     resolve.loc[:,'g3grpdedeg_l']=resolveg3grpdedeg
     resolve.loc[:,'g3grpcz_l']=resolveg3grpcz
@@ -304,4 +400,61 @@ if __name__=='__main__':
     resolve.loc[:,'g3grptcross_l']=resolveg3grptcross
     resolveg3dynmass[(resolveg3grpngi+resolveg3grpndw)<=7]=-999.
     resolve.loc[:,'g3logmhdyn_l']=resolveg3dynmass
+
+    # these arrays still have -999's for B-semester sub-floor dwarfs.
+    # need to add group quantities for those. If in group, fill from host group metrics.
+    # if isolated sub-floor dwarf, set to galx properties.
+    subfloordwarfsB = resolve[(resolve.f_b==1)&(resolve.absrmag>-17.)]
+    for subfloorname,grpidvalue in zip(subfloordwarfsB.name.to_numpy(), subfloordwarfsB.g3grp_l.to_numpy()):
+        fillsel = (resolve.name==subfloorname)
+        grpsel = (resolve.g3grp_l==grpidvalue)&(resolve.absrmag<=-17.0)
+        if np.sum(grpsel)>0:
+            #eco.loc[fillsel,'g3grplogG_l']=np.mean(eco.loc[grpsel,'g3grplogG_l'])
+            resolve.loc[fillsel,'g3logmh_l'] = np.mean(resolve.loc[grpsel,'g3logmh_l'])
+            resolve.loc[fillsel,'g3logmh200_l']= np.mean(resolve.loc[grpsel,'g3logmh200_l'])
+            resolve.loc[fillsel,'g3grplogG_l'] = np.mean(resolve.loc[grpsel,'g3grplogG_l'])
+            resolve.loc[fillsel,'g3grplogS_l'] = np.mean(resolve.loc[grpsel,'g3grplogS_l'])
+            resolve.loc[fillsel,'g3grplogB_l'] = np.mean(resolve.loc[grpsel,'g3grplogB_l'])
+            resolve.loc[fillsel,'g3grpabsrmag_l']= np.mean(resolve.loc[grpsel,'g3grpabsrmag_l'])
+            resolve.loc[fillsel,'g3grpgiantabsrmag_l']= np.mean(resolve.loc[grpsel,'g3grpgiantabsrmag_l'])
+            resolve.loc[fillsel,'g3grpmhi_l']= np.mean(resolve.loc[grpsel,'g3grpmhi_l'])
+            resolve.loc[fillsel,'g3cenmhi_l']= np.mean(resolve.loc[grpsel,'g3cenmhi_l'])
+            resolve.loc[fillsel,'g3satmhi_l']= np.mean(resolve.loc[grpsel,'g3satmhi_l'])
+            resolve.loc[fillsel,'g3grpradeg_l']= np.mean(resolve.loc[grpsel,'g3grpradeg_l'])
+            resolve.loc[fillsel,'g3grpdedeg_l']= np.mean(resolve.loc[grpsel,'g3grpdedeg_l'])
+            resolve.loc[fillsel,'g3grpcz_l']= np.mean(resolve.loc[grpsel,'g3grpcz_l'])
+            resolve.loc[fillsel,'g3fc_l']=np.mean(resolve.loc[grpsel,'g3fc_l'])
+            resolve.loc[fillsel,'g3grpngi_l']=np.mean(resolve.loc[grpsel,'g3grpngi_l'])
+            resolve.loc[fillsel,'g3grpndw_l']=np.mean(resolve.loc[grpsel,'g3grpndw_l'])
+            resolve.loc[fillsel,'g3grpnndens_l']=np.mean(resolve.loc[grpsel,'g3grpnndens_l'])
+            resolve.loc[fillsel,'g3grpedgeflag_l']=np.mean(resolve.loc[grpsel,'g3grpedgeflag_l'])
+            resolve.loc[fillsel,'g3grpnndens2d_l']= np.mean(resolve.loc[grpsel,'g3grpnndens2d_l'])
+            resolve.loc[fillsel,'g3grpedgeflag2d_l']= np.mean(resolve.loc[grpsel,'g3grpedgeflag2d_l'])
+            resolve.loc[fillsel,'g3grpedgescale2d_l']= np.mean(resolve.loc[grpsel, 'g3grpedgescale2d_l'])
+            resolve.loc[fillsel,'g3grptcross_l']= np.mean(resolve.loc[grpsel, 'g3grptcross_l'])
+            resolve.loc[fillsel,'g3logmhdyn_l'] = np.mean(resolve.loc[grpsel, 'g3logmhdyn_l'])
+        else:
+            resolve.loc[fillsel,'g3logmh_l'] = mhsplineEXTRAP(resolve.loc[fillsel,'absrmag'])
+            resolve.loc[fillsel,'g3logmh200_l']= mhsplineEXTRAP200(resolve.loc[fillsel,'absrmag']) # fix here
+            resolve.loc[fillsel,'g3grplogG_l'] = resolve.loc[fillsel,'logmgas']
+            resolve.loc[fillsel,'g3grplogS_l']= resolve.loc[fillsel,'logmstar']
+            resolve.loc[fillsel,'g3grplogB_l']= resolve.loc[fillsel,'logmbary']
+            resolve.loc[fillsel,'g3grpabsrmag_l']=resolve.loc[fillsel,'absrmag']
+            resolve.loc[fillsel,'g3grpgiantabsrmag_l']=-999.
+            resolve.loc[fillsel,'g3grpmhi_l']=np.log10(10**resolve.loc[fillsel,'logmgas']/1.4)
+            resolve.loc[fillsel,'g3cenmhi_l']=np.log10(10**resolve.loc[fillsel,'logmgas']/1.4)
+            resolve.loc[fillsel,'g3satmhi_l']=0.
+            resolve.loc[fillsel,'g3grpradeg_l']=resolve.loc[fillsel,'radeg']
+            resolve.loc[fillsel,'g3grpdedeg_l']=resolve.loc[fillsel,'dedeg']
+            resolve.loc[fillsel,'g3grpcz_l']=resolve.loc[fillsel,'cz']
+            resolve.loc[fillsel,'g3fc_l']=1.
+            resolve.loc[fillsel,'g3grpngi_l']=0.
+            resolve.loc[fillsel,'g3grpndw_l']=1.
+            resolve.loc[fillsel,'g3grpnndens_l']= -999.
+            resolve.loc[fillsel,'g3grpedgeflag_l']= -999.
+            resolve.loc[fillsel,'g3grpnndens2d_l']= -999.
+            resolve.loc[fillsel,'g3grpedgeflag2d_l']= -999.
+            resolve.loc[fillsel,'g3grpedgescale2d_l']= -999.
+            resolve.loc[fillsel,'g3grptcross_l']= -999.
+            resolve.loc[fillsel,'g3logmhdyn_l'] = -999.
     resolve.to_csv("RESOLVEdata_G3catalog_luminosity.csv",index=False)
