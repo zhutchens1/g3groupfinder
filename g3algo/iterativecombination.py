@@ -370,6 +370,41 @@ def get_int_mag(galmags, grpid):
         grpmags[sel]=totalmag
     return grpmags
 
+def get_int_mag_giants(galmags, grpid, divider=-19.5):
+    """
+    Given a list of galaxy absolute magnitudes and group ID numbers,
+    compute group-integrated total magnitudes. This function only 
+    considers giant galaxies (default <=-19.5) when integrating
+    group luminosity. Dwarf-only groups return -999.
+
+    Parameters
+    ------------
+    galmags : iterable
+       List of absolute magnitudes for every galaxy (SDSS r-band).
+    grpid : iterable
+       List of group ID numbers for every galaxy.
+    divider : float
+        Giant galaxy - dwarf galaxy divide in magnitude units.
+
+    Returns
+    ------------
+    grpmags : np array
+       Array containing group-integrated magnitudes for each galaxy. Length matches `galmags`.
+    """
+    galmags=np.asarray(galmags)
+    grpid=np.asarray(grpid)
+    grpmags = np.zeros(len(galmags))
+    uniqgrpid=np.unique(grpid)
+    for uid in uniqgrpid:
+        sel=np.where(grpid==uid)
+        intsel = np.where(np.logical_and(grpid==uid, galmags<=divider))
+        if len(intsel[0])==0:
+            grpmags[sel]=-999. # dwarf-only group
+        else:
+            mags_to_int = galmags[intsel]
+            totalmag = -2.5*np.log10(np.sum(10**(-0.4*mags_to_int)))
+            grpmags[sel]=totalmag
+    return grpmags
 
 def get_int_mass(galmass, grpid):
     """

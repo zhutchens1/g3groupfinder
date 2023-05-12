@@ -67,7 +67,7 @@ def iterative_combination_giants(galaxyra,galaxydec,galaxycz,giantfofid,rprojbou
         giantgroupid = nearest_neighbor_assign(galaxyra,galaxydec,galaxycz,oldgiantgroupid,rprojboundary,vprojboundary,centermethod,decisionmode,H0)
         converged = np.array_equal(oldgiantgroupid,giantgroupid)
         niter+=1
-    print("Giant-only iterative combiation complete.")
+    print("Giant-only iterative combination complete.")
     return giantgroupid
 
 

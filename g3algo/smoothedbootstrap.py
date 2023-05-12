@@ -6,7 +6,7 @@ adapted from astroML.resample.bootstrap September 2016
 
 import numpy as np
 import numpy.random as npr
-from astroML.utils import check_random_state
+from sklearn.utils import check_random_state
 
 
 def smoothedbootstrap(data, n_bootstraps, user_statistic, kwargs=None,
