@@ -951,3 +951,35 @@ def get_rproj_czdisp_stierwalt(galaxyra,galaxydec,galaxycz,galaxygrpid,HUBBLE_CO
             sig3d = 1.73205080757 * np.sqrt(np.average(galaxycz[sel]*galaxycz[sel]) - grpcz[sel][0]*grpcz[sel][0])
             vdisp[sel] = sig3d
     return rproj,vdisp
+
+def galaxies_in_RESA_sky(ra,dec):
+    ra=np.array(ra)
+    dec=np.array(dec)
+    return ((ra>131.25) & (ra<236.25) & (dec>0) & (dec<5))
+
+def get_skycutoff_flag_RESA(ra,dec,grpid):
+    """
+    Return a 1/0 flag indicating whether a RESOLVE-A group is cutoff
+    by the survey edges. Values passed should be from ECO galaxies,
+    as this code checks whether a group members BOTH in RESOLVE-A and
+    outside RESOLVE-A.
+    
+    ra, dec, grpid: RA, Dec, and grpid for each ECO galaxy (array_like)
+    returns: 1/0 skycutoff flag (np.array). 1 if galaxy's group is intersected
+        survey edges
+    """
+    ra=np.array(ra)
+    dec=np.array(dec)
+    grpid=np.array(grpid)
+    flag = np.zeros(len(grpid))
+    uniqids = np.unique(grpid)
+    for uid in uniqids:
+        sel = (grpid==uid)
+        bool_array = galaxies_in_RESA_sky(ra[sel],dec[sel])
+        cond1 = bool_array.any()
+        cond2 = np.logical_not(bool_array).any()
+        if (cond1 and cond2):
+            flag[sel] = 1
+        else:
+            flag[sel] = 0
+    return flag 

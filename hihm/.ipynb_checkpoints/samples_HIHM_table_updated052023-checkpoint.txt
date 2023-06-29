@@ -1,0 +1,15 @@
+\begin{tabular}{lrrrrrrr}
+\toprule
+{} &  \$M\_0\$ &  \$\textbackslash Delta M\_0\$ &  \$M\_\{\textbackslash rm min\}\$ &  \$\textbackslash Delta M\_\{\textbackslash rm min\}\$ &  \$\textbackslash alpha\$ &  \$\textbackslash Delta\textbackslash alpha\$ &  Scatter \\
+Sample           &        &               &                &                       &           &                 &          \\
+\midrule
+ECO+RES-B        &  9.346 &         0.942 &         11.215 &                 1.041 &     0.342 &           0.025 &    0.301 \\
+ECO--RES-A       &  9.355 &         0.935 &         11.228 &                 1.032 &     0.340 &           0.025 &    0.300 \\
+Full RES         &  9.356 &         0.742 &         11.199 &                 0.838 &     0.321 &           0.048 &    0.302 \\
+Full ECO         &  9.346 &         0.959 &         11.210 &                 1.052 &     0.343 &           0.024 &    0.297 \\
+ECO+RES-B -- FoF &  9.533 &         0.808 &         11.314 &                 0.908 &     0.147 &           0.058 &    0.309 \\
+ECO-RES-A -- FoF &  9.535 &         0.816 &         11.319 &                 0.927 &     0.159 &           0.055 &    0.306 \\
+Full RES -- FoF  &  9.456 &         0.657 &         11.226 &                 0.722 &     0.184 &           0.069 &    0.318 \\
+Full ECO -- FoF  &  9.518 &         0.815 &         11.297 &                 0.906 &     0.165 &           0.056 &    0.306 \\
+\bottomrule
+\end{tabular}
