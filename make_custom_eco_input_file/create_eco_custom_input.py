@@ -1,10 +1,9 @@
 startingfile = "ECOdata_051123.csv"
 ecodr2file = "ECODR2_052423.csv"
 photinputfile = '/srv/two/sheila/pops/ECO_all_massinputfilefix.txt'
-outputfile = 'eco_dr3_base_062823.csv'
+outputfile = 'eco_dr3_base_071223.csv'
 sedsuppdata = '/srv/two/sheila/pops/ecodr3fixsuppdata.dat'
 sedmasses = '/srv/two/sheila/pops/ecodr3fixbmasses.dat'
-sedssfrs = '/srv/two/sheila/pops/ecodr3fixbssfrs.dat'
 sedextdists = '/srv/two/sheila/pops/ecodr3fixbextdists.dat'
 sedkcorrs = '/srv/two/sheila/pops/ecodr3fixbkcorrs.dat'
 
@@ -12,16 +11,24 @@ resinputfile = '/srv/two/sheila/pops/resolve_fuvnuvuvot_ugriz_YJHKall.txt'
 rs0106inputfile = '/srv/two/sheila/pops/rs0106_fuvnuvuvot_ugriz_YJHKall.txt'
 ressedsuppdata = '/srv/two/sheila/pops/resdr4suppdata.dat'
 ressedbmasses = '/srv/two/sheila/pops/resdr4bmasses.dat'
-ressedbssfrs = '/srv/two/sheila/pops/resdr4bssfrs.dat'
 ressedbextdists = '/srv/two/sheila/pops/resdr4bextdists.dat'
 ressedbkcorrs = '/srv/two/sheila/pops/resdr4bkcorrs.dat'
 resoutputfile = 'res_dr4_base_062823.csv'
+
+
 
 import pandas as pd
 import numpy as np
 from calculate_logmgas import calculate_logmgas_hutchens23
 from scipy.io import readsav
 import subprocess 
+import pdb
+from astropy.cosmology import LambdaCDM
+hubble_const = 70.
+omega_m = 0.3
+omega_de0 = 0.7
+cspeed=3e5
+cosmo = LambdaCDM(hubble_const, Om0=omega_m, Ode0=omega_de0)
 
 if __name__=='__main__':
     ecoliv = pd.read_csv(startingfile).set_index('name').sort_index()
@@ -30,7 +37,6 @@ if __name__=='__main__':
     ## directly from raw files on disk
     ecoliv = ecoliv.drop(labels=['logmstar'],axis=1)
     ecoliv = ecoliv.drop(labels=[kk for kk in ecoliv.keys() if (('logmstar' in kk) or ('fsmgr' in kk) or ('sfr' in kk) or ('dgr' in kk) or ('mu_delta' in kk))], axis=1)
-    print("NOTE: need to figure out what to do about dgr")
     ecoliv = ecoliv.drop(labels=[kk for kk in ecoliv.keys() if 'mag' in kk],axis=1) # drop mags and errors 
     ecoliv = ecoliv.drop(labels=[kk for kk in ecoliv.keys() if (('_' in kk) and ('model' in kk))],axis=1) # drop modelx_y, modelx_ycorr
     ecoliv = ecoliv.drop(labels=[kk for kk in ecoliv.keys() if 'ext' in kk],axis=1) # drop extinctions
@@ -96,50 +102,42 @@ if __name__=='__main__':
     sel = (ecoliv.nuvmag<1)
     ecoliv.loc[sel,'nuvmag'] = 0.0
 
-    # set all phot to -999 where mags or errors == 0
-    # where errors exceed cuts, still report values, but state in paper they are excluded from SED modeling and absrmag
-    #photerrcut={'nuv':3.6, 'u':3, 'g':1.7, 'r':1.7, 'i':1.7, 'z':1.7, 'Y':2.3, 'J':2.3, 'H':2.3, 'K':2.3}
+    # Put parenthesis around mag with the catatrosphic errors
+    ecoliv.loc[:,'absrmag'] = (ecoliv.rmag + 5 - 5*np.log10(cosmo.luminosity_distance(np.array(ecoliv.cz)/cspeed).to_value() * 1e6) - ecoliv.extr)
+    ecoliv.loc[:,'absgmag'] = (ecoliv.gmag + 5 - 5*np.log10(cosmo.luminosity_distance(np.array(ecoliv.cz)/cspeed).to_value() * 1e6) - ecoliv.extg)
+    ecoliv = ecoliv.round({kk:3 for kk in ecoliv.keys() if 'mag' in kk})
+    for kk in ecoliv.keys():
+        if 'mag' in kk:
+            ecoliv[kk+'_withoutparens'] = ecoliv[kk].copy()
+    ecoliv = ecoliv.astype({kk:str for kk in ecoliv.keys() if (('mag' in kk) and ('withoutparens' not in kk))})
     photerrcut={'nuv':3.6, 'u':3, 'g':1.7, 'r':1.7, 'i':1.7, 'z':1.7, 'uy':2.3, '2j':2.3, '2h':2.3, '2k':2.3, 'uh':2.3, 'uk':2.3}
     filterbands=['uvm2','nuv','u','g','r','i','z','uy','uh','uk','2j','2k','2h']
     extbands=['uvm2','nuv','u','g','r','i','z','y','h','k','j','k','h']
-    rejphotstring = ['']*len(ecoliv.index)
     for ii,nn in enumerate(ecoliv.index):
         for bb in filterbands:
-            if bb!='uvm2':                  
-                if (ecoliv.loc[nn,'e_'+bb+'mag']>photerrcut[bb]):
-                    rejphotstring[ii] += (bb+'='+str(ecoliv.loc[nn,bb+'mag'])+'+-'+str(ecoliv.loc[nn,'e_'+bb+'mag'])+'/')
-                    ecoliv.loc[nn,bb+'mag']=0
-                    ecoliv.loc[nn,'e_'+bb+'mag']=0
-
-        hasnuvur = ecoliv.loc[nn,'nuvmag']>0 and ecoliv.loc[nn,'umag']>0 and ecoliv.loc[nn,'rmag']>0
-        badnuvcolor = (ecoliv.loc[nn,'nuvmag']-ecoliv.loc[nn,'umag'])<-4
-        inurrange = ((ecoliv.loc[nn,'umag']-ecoliv.loc[nn,'rmag'])>-2.5) and ((ecoliv.loc[nn,'umag']-ecoliv.loc[nn,'rmag'])<4.5)
+            if bb!='uvm2':
+                if (ecoliv.loc[nn,'e_'+bb+'mag_withoutparens']>photerrcut[bb]):
+                    ecoliv.loc[nn,bb+'mag']='('+str(ecoliv.loc[nn,bb+'mag'])+')'
+                    ecoliv.loc[nn,'e_'+bb+'mag']='('+str(ecoliv.loc[nn,'e_'+bb+'mag'])+')'
+                    if 'abs'+bb+'mag' in ecoliv.keys():
+                        ecoliv.loc[nn,'abs'+bb+'mag']='('+str(ecoliv.loc[nn,'abs'+bb+'mag'])+')'
+        hasnuvur = ecoliv.loc[nn,'nuvmag_withoutparens']>0 and ecoliv.loc[nn,'umag_withoutparens']>0 and ecoliv.loc[nn,'rmag_withoutparens']>0
+        badnuvcolor = (ecoliv.loc[nn,'nuvmag_withoutparens']-ecoliv.loc[nn,'umag_withoutparens'])<-4
+        inurrange = ((ecoliv.loc[nn,'umag_withoutparens']-ecoliv.loc[nn,'rmag_withoutparens'])>-2.5) and ((ecoliv.loc[nn,'umag_withoutparens']-ecoliv.loc[nn,'rmag_withoutparens'])<4.5)
         if hasnuvur and badnuvcolor and inurrange:
-            rejphotstring[ii] += ('nuv'+'='+str(ecoliv.loc[nn,'nuv'+'mag'])+'+-'+str(ecoliv.loc[nn,'e_'+'nuv'+'mag'])+'/')
-            ecoliv.loc[nn,'nuvmag']=0.0
-            ecoliv.loc[nn,'e_nuvmag']=0.0
+            ecoliv.loc[nn,'nuvmag']='('+str(ecoliv.loc[nn,'nuv'+'mag'])+')'
+            ecoliv.loc[nn,'e_nuvmag']='('+str(ecoliv.loc[nn,'e_'+'nuv'+'mag'])+')'
         elif hasnuvur and badnuvcolor and (not inurrange):
-            rejphotstring[ii] += ('u'+'='+str(ecoliv.loc[nn,'u'+'mag'])+'+-'+str(ecoliv.loc[nn,'e_'+'u'+'mag'])+'/')
-            ecoliv.loc[nn,'umag']=0.0
-            ecoliv.loc[nn,'e_umag']=0.0
-        if rejphotstring[ii]=='':
-            rejphotstring[ii]='None'
+            ecoliv.loc[nn,'umag']='('+str(ecoliv.loc[nn,'u'+'mag'])+')'
+            ecoliv.loc[nn,'e_umag']='('+str(ecoliv.loc[nn,'e_'+'u'+'mag'])+')'
 
-    ecoliv.loc[:,'absrmag'] = (ecoliv.rmag + 5 - 5*np.log10(ecoliv.cz/70. * 1e6) - ecoliv.extr)
-    badabsrmagsel = (ecoliv['rmag']==0.0) | (ecoliv['e_rmag']==0.0) | (ecoliv['e_rmag']>=photerrcut['r'])
-    ecoliv.loc[badabsrmagsel,'absrmag'] = 0.0 # set to +999, not -999, so not included with Mr<-17 or similar
-    ecoliv.loc[:,'rejectedphot'] = rejphotstring
-    #print(ecoliv[ecoliv.rejectedphot!='None'][['nuvmag','umag','gmag','rmag','imag','e_imag','zmag','uymag','ukmag','uhmag','2jmag','2kmag','2hmag','rejectedphot']])
-    
     # get SED info from Sheila's code outputs, and construct into a single dataframe
     sednames = readsav(sedsuppdata)['name']
     sednames = np.array([nn.decode('utf-8') for nn in sednames])
     masses = readsav(sedmasses)['medmass']
-    ssfrs = readsav(sedssfrs)['meanssfr']
-    sedoutputs = pd.DataFrame({'name':sednames,'logmstar':masses,'ssfr':ssfrs})
-    print("NOTE: check if overwriting existing instance of SSFR?")
+    sedoutputs = pd.DataFrame({'name':sednames,'logmstar':masses})
     sheilamap = {'u':0,'g':1,'r':2,'i':3,'z':4,'j':5,'h':6,'k':7,'nuv':8,'uy':9,'uh':10,'uk':11,'uvotm2':12}#makeresolvecatalog 1448
-    colors_need_to_get=['nuv_r','u_r','u_i','u_j','u_k','g_r','g_i','g_j','g_k']
+    colors_need_to_get=['nuv_r','u_r','u_i','u_j','u_k','g_r','g_i','g_j','g_k','nuv_k']
     colorfile = readsav(sedextdists)
     for cc in colors_need_to_get:
         f1,f2 = cc.split('_')
@@ -152,7 +150,6 @@ if __name__=='__main__':
     assert (sedoutputs.index==ecoliv.index).all()
     ecoliv = pd.concat([ecoliv,sedoutputs],axis=1)
 
-    print(ecoliv[ecoliv.index=='ECO02388'].logmstar)
     
     ##########################################################
     ##########################################################
@@ -327,9 +324,7 @@ if __name__=='__main__':
     resinput=resinput.rename(cnamemapping,inplace=False,axis=1)
 
     masses = readsav(ressedbmasses)['medmass']
-    ssfrs = readsav(ressedbssfrs)['meanssfr']
-    ressedboutputs = pd.DataFrame({'name':officialresname,'logmstar':masses,'ssfr':ssfrs})
-    print("NOTE: check if overwriting existing instance of SSFR?")
+    ressedboutputs = pd.DataFrame({'name':officialresname,'logmstar':masses})
     colorfile = readsav(ressedbextdists)
     for cc in colors_need_to_get:
         f1,f2 = cc.split('_')
@@ -341,47 +336,45 @@ if __name__=='__main__':
     assert len(ressedboutputs)==len(resinput)
     assert (ressedboutputs.index==resinput.index).all()
     resphot = pd.concat([resinput,ressedboutputs],axis=1)
-    print(resphot[resphot.index=='rs0498'].logmstar)
-
-    ################################################
-    # Create rejected photometry string for RESOLVE
-    rejphotstring = ['']*len(resphot.index)
-    for ii,nn in enumerate(resphot.index):
-        for bb in filterbands:
-            if bb!='uvm2':
-                if (resphot.loc[nn,'e_'+bb+'mag']>photerrcut[bb]):
-                    rejphotstring[ii] += (bb+'='+str(resphot.loc[nn,bb+'mag'])+'+-'+str(resphot.loc[nn,'e_'+bb+'mag'])+'/')
-                    resphot.loc[nn,bb+'mag']=0
-                    resphot.loc[nn,'e_'+bb+'mag']=0
-
-        hasnuvur = resphot.loc[nn,'nuvmag']>0 and resphot.loc[nn,'umag']>0 and resphot.loc[nn,'rmag']>0
-        badnuvcolor = (resphot.loc[nn,'nuvmag']-resphot.loc[nn,'umag'])<-4
-        inurrange = ((resphot.loc[nn,'umag']-resphot.loc[nn,'rmag'])>-2.5) and ((resphot.loc[nn,'umag']-resphot.loc[nn,'rmag'])<4.5)
-        if hasnuvur and badnuvcolor and inurrange:
-            rejphotstring[ii] += ('nuv'+'='+str(resphot.loc[nn,'nuv'+'mag'])+'+-'+str(resphot.loc[nn,'e_'+'nuv'+'mag'])+'/')
-            resphot.loc[nn,'nuvmag']=0.0
-            resphot.loc[nn,'e_nuvmag']=0.0
-        elif hasnuvur and badnuvcolor and (not inurrange):
-            rejphotstring[ii] += ('u'+'='+str(resphot.loc[nn,'u'+'mag'])+'+-'+str(resphot.loc[nn,'e_'+'u'+'mag'])+'/')
-            resphot.loc[nn,'umag']=0.0
-            resphot.loc[nn,'e_umag']=0.0
-        if rejphotstring[ii]=='':
-            rejphotstring[ii]='None'
     
-    resphot.loc[:,'rejectedphot'] = rejphotstring
     # Trim file to just the previously published RESOLVE names
     # also get cz and compute absrmag for substitution into ECO catalog 
     resliv = pd.read_csv("RESOLVEliving_061223.csv")[['name','f_a','f_b','cz','econame','r50','r90','b_a','mhidet','emhidet','mhilim','confused','mhi_corr','emhi_corr_rand','emhi_corr_sys']].set_index('name')
     resphot = resphot.loc[resliv.index,:]
     resphot = pd.concat([resphot,resliv],axis=1)
-    resphot.loc[:,'absrmag'] = (resphot.rmag + 5 - 5*np.log10(resphot.cz/70. * 1e6 - resphot.extr))
-    badabsrmagsel = (resphot['rmag']==0.0) | (resphot['e_rmag']==0.0) | (resphot['e_rmag']>=photerrcut['r'])
-    resphot.loc[badabsrmagsel,'absrmag'] = 0.0 # set to +999, not -999, so not included with Mr<-17 or similar
+    resphot.loc[:,'absrmag'] = (resphot.rmag + 5 - 5*np.log10(cosmo.luminosity_distance(np.array(resphot.cz)/cspeed).to_value() * 1e6) - resphot.extr)
+    resphot.loc[:,'absgmag'] = (resphot.gmag + 5 - 5*np.log10(cosmo.luminosity_distance(np.array(resphot.cz)/cspeed).to_value() * 1e6) - resphot.extg)
     resphot.rename({'ra':'radeg','dec':'dedeg'},inplace=True,axis=1) 
     resphot.drop(['vlg','fuv','fuverr','extfuv','extnuvwyder'],axis=1,inplace=True)
 
-    print(resphot[resphot.rejectedphot!='None'][['nuvmag','e_nuvmag','umag','ukmag','uhmag','absrmag','rmag','rejectedphot']])
-    print(resphot.loc['rs1515','rejectedphot']) 
+
+    # Put parenthesis around mag with the catatrosphic errors
+    resphot = resphot.round({kk:3 for kk in resphot.keys() if 'mag' in kk})
+    for kk in resphot.keys():
+        if 'mag' in kk:
+            resphot[kk+'_withoutparens'] = resphot[kk].copy()
+    resphot = resphot.astype({kk:str for kk in resphot.keys() if (('mag' in kk) and ('withoutparens' not in kk))})
+    photerrcut={'nuv':3.6, 'u':3, 'g':1.7, 'r':1.7, 'i':1.7, 'z':1.7, 'uy':2.3, '2j':2.3, '2h':2.3, '2k':2.3, 'uh':2.3, 'uk':2.3}
+    filterbands=['uvm2','nuv','u','g','r','i','z','uy','uh','uk','2j','2k','2h']
+    extbands=['uvm2','nuv','u','g','r','i','z','y','h','k','j','k','h']
+    for ii,nn in enumerate(resphot.index):
+        for bb in filterbands:
+            if bb!='uvm2':
+                if (resphot.loc[nn,'e_'+bb+'mag_withoutparens']>photerrcut[bb]):
+                    resphot.loc[nn,bb+'mag']='('+str(resphot.loc[nn,bb+'mag'])+')'
+                    resphot.loc[nn,'e_'+bb+'mag']='('+str(resphot.loc[nn,'e_'+bb+'mag'])+')'
+                    if 'abs'+bb+'mag' in resphot.keys():
+                        resphot.loc[nn,'abs'+bb+'mag']='('+str(resphot.loc[nn,'abs'+bb+'mag'])+')'
+        hasnuvur = resphot.loc[nn,'nuvmag_withoutparens']>0 and resphot.loc[nn,'umag_withoutparens']>0 and resphot.loc[nn,'rmag_withoutparens']>0
+        badnuvcolor = (resphot.loc[nn,'nuvmag_withoutparens']-resphot.loc[nn,'umag_withoutparens'])<-4
+        inurrange = ((resphot.loc[nn,'umag_withoutparens']-resphot.loc[nn,'rmag_withoutparens'])>-2.5) and ((resphot.loc[nn,'umag_withoutparens']-resphot.loc[nn,'rmag_withoutparens'])<4.5)
+        if hasnuvur and badnuvcolor and inurrange:
+            resphot.loc[nn,'nuvmag']='('+str(resphot.loc[nn,'nuv'+'mag'])+')'
+            resphot.loc[nn,'e_nuvmag']='('+str(resphot.loc[nn,'e_'+'nuv'+'mag'])+')'
+        elif hasnuvur and badnuvcolor and (not inurrange):
+            resphot.loc[nn,'umag']='('+str(resphot.loc[nn,'u'+'mag'])+')'
+            resphot.loc[nn,'e_umag']='('+str(resphot.loc[nn,'e_'+'u'+'mag'])+')'
+
     # Substitute quantities into ECO
     ecoliv = ecoliv.reset_index().set_index('resname').sort_index()
     resatmp = resphot.loc[[ii for ii in resphot.index if 'rs' in ii],:].sort_index()
@@ -391,20 +384,25 @@ if __name__=='__main__':
     ecoliv = ecoliv.reset_index().set_index('name')
 
     # Deal with ECO13546 // rs1519 (needs to be added to RESOLVE file)
-    resphot = pd.concat([resphot,ecoliv.loc[['ECO13546'],['resname']+[kk for kk in resphot.keys() if kk not in ('econame','f_a','f_b')]].set_index('resname')],axis=0)
+    # also add rs1520/ECO01169, rs1521/ECO01356, and rs1522/ECO12853
+    ecoliv.loc['ECO01169','resname'] = 'rs1520'
+    ecoliv.loc['ECO01356','resname'] = 'rs1521'
+    ecoliv.loc['ECO12853','resname'] = 'rs1522'
+    resphot = pd.concat([resphot,ecoliv.loc[['ECO13546','ECO01169','ECO01356','ECO12853'],['resname']+[kk for kk in resphot.keys() if kk not in ('econame','f_a','f_b')]].set_index('resname')],axis=0)
     resphot.loc['rs1519','econame'] = 'ECO13546'
-    
+    resphot.loc['rs1520','econame'] = 'ECO01169'
+    resphot.loc['rs1521','econame'] = 'ECO01356'
+    resphot.loc['rs1522','econame'] = 'ECO12853'
+  
+    assert len(ecoliv[[('rs' in nn) for nn in ecoliv.resname]])==len(resphot[[('rs' in nn) for nn in resphot.index]])
+ 
     # Calculate remaining photometry outputs
     calc_mu_delta = lambda mstar, r50, r90: np.log10(0.9*mstar/(np.pi*r90*r90)) + 1.7*(np.log10(0.5*mstar/(np.pi*r50*r50)) - np.log10(0.4*mstar/(np.pi*r90*r90 - np.pi*r50*r50))) # K13 eq. 1-3
-    ecoliv.loc[:,'mu_delta'] = calc_mu_delta(10**ecoliv.logmstar, ecoliv.cz/70.*1e3*ecoliv.r50/206265, ecoliv.cz/70.*1e3*ecoliv.r90/206265)
-    ecoliv.loc[ecoliv[ecoliv.r50==ecoliv.r90].index,'mu_delta'] = -999.
-    ecoliv.loc[ecoliv[ecoliv.r50==ecoliv.r90].index,'r90'] = -999.
-    ecoliv.loc[ecoliv[ecoliv.r50==ecoliv.r90].index,'r50'] = -999.
-    ecoliv.loc[ecoliv[ecoliv.r50<0].index,'mu_delta'] = -999.
-    ecoliv.loc[ecoliv[ecoliv.r50<0].index,'r50'] = -999.
-    ecoliv.loc[ecoliv[ecoliv.r50<0].index,'r90'] = -999.
+    ecoliv.loc[:,'r50_in_kpc'] = ecoliv.r50/206265 * cosmo.angular_diameter_distance(np.array(ecoliv.cz)/cspeed).value * 1e3 # kpc/Mpc
+    ecoliv.loc[:,'r90_in_kpc'] = ecoliv.r90/206265 * cosmo.angular_diameter_distance(np.array(ecoliv.cz)/cspeed).value * 1e3 # kpc/Mpc
+    ecoliv.loc[:,'mu_delta'] = calc_mu_delta(10**ecoliv.logmstar, ecoliv.r50_in_kpc, ecoliv.r90_in_kpc)
+    ecoliv.loc[ecoliv[(ecoliv.r50==ecoliv.r90)|(ecoliv.r50<0)].index,['mu_delta','r50','r90']] = -999.
     resphot.loc[:,'mu_delta'] = calc_mu_delta(10**resphot.logmstar, resphot.cz/70.*1e3*resphot.r50/206265, resphot.cz/70.*1e3*resphot.r90/206265)
-    print("NOTE: setting mu_delta to -999 where ECO r50==r90. may need to address this")
 
     print(ecoliv)
     print(resphot)
@@ -418,9 +416,10 @@ if __name__=='__main__':
     ecoliv.loc[:,'cz-e16'] = ecodr2.loc[:,'cz']#ecodr2.cz.to_numpy()
     ecoliv.loc[:,'grpcz-e17'] = ecodr2.loc[:,'grpcz_e17']#ecodr2.grpcz.to_numpy()
     ecoliv.loc[:,'absrmag-e16'] = ecodr2.loc[:,'absrmag']#ecodr2.absrmag.to_numpy()
+    ecoliv.loc[:,'fm15'] = ecodr2.loc[:,'fm15']
     
     cznew_over_czold = (ecoliv.cz / ecoliv['cz-e16'])
-    ecoliv.loc[:,'logmstar'] = np.log10(10**ecoliv.logmstar *  cznew_over_czold**2.) # like L = 4 pi d^2 f
+    ecoliv.loc[:,'logmstar'] = np.log10(10**ecoliv.logmstar * (cosmo.luminosity_distance(np.array(ecoliv.cz)/cspeed).to_value())**2./(ecoliv['cz-e16']/hubble_const)**2. ) # like L = 4 pi d^2 f
     # note: don't need to do absrmag, calculated above using up-to-date cz
 
     # scale mhidet_a100
@@ -436,12 +435,11 @@ if __name__=='__main__':
         alfa_v_value = a100vhel[alfasel]
         cznew_over_czalfa[ii] = eco_cz[ii] / alfa_v_value # cz_new / cz_alpha100
     
-    ecoliv.loc[sel,'mhidet_a100'] = ecoliv.loc[sel,'mhidet_a100'] * (cznew_over_czalfa)**2.
-
+    ecoliv.loc[sel,'mhidet_a100'] = ecoliv.loc[sel,'mhidet_a100'] * (cznew_over_czalfa)**2. * (cosmo.luminosity_distance(np.array(ecoliv.loc[sel,'cz']/cspeed)).to_value()**2./(ecoliv.loc[sel,'cz']/hubble_const)**2.) / (1+(ecoliv.loc[sel,'cz']/cspeed))**2.
     print(np.max(cznew_over_czalfa),np.min(cznew_over_czalfa))
 
     # scale mhilim_a100
-    ecoliv.loc[:,'mhilim_a100'] = ecoliv.loc[:,'mhilim_a100'] * (cznew_over_czold)**2.
+    ecoliv.loc[:,'mhilim_a100'] = ecoliv.loc[:,'mhilim_a100'] * (cznew_over_czold)**2. * (cosmo.luminosity_distance(np.array(ecoliv.loc[:,'cz']/cspeed)).to_value()**2./(ecoliv.loc[:,'cz']/hubble_const)**2.) / (1+(ecoliv.loc[:,'cz']/cspeed))**2
 
     # now update mhidet and mhilim and limsigma
     # NOTE: don't need to change mhidet or mhilim b/c these inherited from RESOLVE (so consistent with existing RESOLVE cz's
@@ -450,7 +448,16 @@ if __name__=='__main__':
     ecoliv.loc[sel,'mhidet'] = ecoliv.loc[sel,'mhidet_a100']
     ecoliv.loc[sel,'mhilim'] = ecoliv.loc[sel,'mhilim_a100']
     ecoliv.loc[sel,'limsigma'] = ecoliv.loc[sel,'mhilim'] / ecoliv.loc[sel,'limmult']
-    
+   
+    # rescale mhidet and mhilim for RESOLVE, re-sub into ECO
+    resphot.loc[:,'mhidet'] = (resphot.mhidet / (1+resphot.cz/cspeed)**2.) * (cosmo.luminosity_distance(np.array(resphot.cz)/cspeed).to_value()**2. / (resphot.cz/hubble_const)**2.)
+    resphot.loc[:,'mhilim'] = (resphot.mhilim / (1+resphot.cz/cspeed)**2.) * (cosmo.luminosity_distance(np.array(resphot.cz)/cspeed).to_value()**2. / (resphot.cz/hubble_const)**2.)
+    ecoliv = ecoliv.reset_index().set_index('resname').sort_index()
+    resatmp = resphot.loc[[ii for ii in resphot.index if 'rs' in ii],:].sort_index()
+    ecoliv.loc[resatmp.index,'mhidet'] = resatmp.loc[resatmp.index,'mhidet']
+    ecoliv.loc[resatmp.index,'mhilim'] = resatmp.loc[resatmp.index,'mhilim']
+    ecoliv = ecoliv.reset_index().set_index('name').sort_index()
+ 
     # re-calculate logmgas and type flags
     out1,out2 = calculate_logmgas_hutchens23(ecoliv.mhidet,ecoliv.mhilim,ecoliv.mhi_corr,ecoliv.emhi_corr_sys,ecoliv.emhi_corr_rand,ecoliv.confused,ecoliv.modelu_j,ecoliv.b_a,ecoliv.logmstar)
     ecoliv.loc[:,'logmgas'] = out1
@@ -464,16 +471,53 @@ if __name__=='__main__':
     resout1,resout2 = calculate_logmgas_hutchens23(resphot.mhidet,resphot.mhilim,resphot.mhi_corr,resphot.emhi_corr_sys,resphot.emhi_corr_rand,resphot.confused,resphot.modelu_j,resphot.b_a,resphot.logmstar)
     resphot.loc[:,'logmgas'] = resout1
     resphot.loc[:,'logmgastype'] = resout2
- 
+
+    #####################################################################
+    #####################################################################
+    #####################################################################
+    # Now need to deal with the ~113 galaxies that had r50==r90 or r50<0.
+    
+    bad_radius_sel = (ecoliv.r50==ecoliv.r90) | (ecoliv.r50<0)
+    ecoliv.loc[:,'badsdssphot'] = bad_radius_sel.astype(int)
+    linefn = lambda x,a,b: a*x+b
+    params0=(1,-0.95-0.5)
+    params1=(-0.5,-0.54-0.5)
+    outlier_in_logmstar = ((ecoliv.logmstar < linefn(ecoliv.absgmag_withoutparens,*params1)) | (ecoliv.absgmag_withoutparens==0)) & (ecoliv.badsdssphot>0)
+    outlier_in_absrmag_withoutparens = ((ecoliv.absrmag_withoutparens < linefn(ecoliv.absgmag_withoutparens,*params0)) | (ecoliv.absgmag_withoutparens==0) | (ecoliv.absrmag_withoutparens==0)) & (ecoliv.badsdssphot>0)
+    # <--plot to check
+
+    # if outlier in absrmag but not in logmstar, then estimate from forward fit to RESOLVE M_r vs. M* -- need to change in absrmag and absrmag_withoutparens
+    forwardfitresolve=np.poly1d(np.polyfit(resphot.logmstar, resphot.absrmag_withoutparens, 1))
+    ecoliv.loc[(outlier_in_absrmag_withoutparens)&(~outlier_in_logmstar),'absrmag_withoutparens'] = forwardfitresolve(ecoliv.loc[(outlier_in_absrmag_withoutparens)&(~outlier_in_logmstar),'logmstar'])
+    ecoliv.loc[(outlier_in_absrmag_withoutparens)&(~outlier_in_logmstar),'absrmag'] = ecoliv.loc[(outlier_in_absrmag_withoutparens)&(~outlier_in_logmstar),'absrmag_withoutparens'].astype(str)
+
+    # for the rest (outlier in logmstar but not in absrmag, or outlier in both, set nominal values in parens)
+    ecoliv['logmstar_withoutparens'] = ecoliv.logmstar.copy()
+    ecoliv = ecoliv.astype({'logmstar':str})
+    for nn in ecoliv.loc[(outlier_in_logmstar)&(~outlier_in_absrmag_withoutparens),:].index:
+        ecoliv.loc[nn,'logmstar'] = '('+str(ecoliv.loc[nn,'logmstar'])+')'
+        ecoliv.loc[nn,'absrmag'] = '('+str(ecoliv.loc[nn,'absrmag'])+')'
+    for nn in ecoliv.loc[(outlier_in_logmstar)&(outlier_in_absrmag_withoutparens),:].index:
+        ecoliv.loc[nn,'logmstar'] = '('+str(ecoliv.loc[nn,'logmstar'])+')'
+        ecoliv.loc[nn,'absrmag'] = '('+str(ecoliv.loc[nn,'absrmag'])+')'
+
     #######################################################
     #######################################################
     #######################################################
     # Remove rs1492, duplicates before group finding
+    # also remove 
     resphot = resphot[resphot.index!='rs1492'] 
     ecoliv = ecoliv[ecoliv.resname!='rs1492'] # get rid of rs1492
+    ecoliv = ecoliv[ecoliv.index!='ECO13245'] # get rid of ECO13245, it's a star
     ecoliv = ecoliv[ecoliv.dup<1] # get rid of duplicates 
 
     ecoliv.rename(columns={'dup':'vif'},inplace=True)
+
+    #######################################################
+    #######################################################
+    # write comoving distances
+    ecoliv.loc[:,'loscmvgdist'] = cosmo.comoving_distance(np.array(ecoliv.loc[:,'cz'])/cspeed).value # in Mpc
+    resphot.loc[:,'loscmvgdist'] = cosmo.comoving_distance(np.array(resphot.loc[:,'cz'])/cspeed).value # in Mpc
     
     #######################################################
     #######################################################
@@ -491,7 +535,6 @@ if __name__=='__main__':
     ecoliv.to_csv('.ECO_csv_for_RESOLVE_FoF.csv')
     subprocess.run(['python3','make_RESOLVE_w_fofgroups.py'])
     resdr4groups = pd.read_csv(".RESOLVE_DR4_groups_only.csv").set_index('name')
-    resdr4groups = resdr4groups.drop(['index'],axis=1)
     resphot = pd.concat([resphot,resdr4groups],axis=1)
 
     ########################################################
