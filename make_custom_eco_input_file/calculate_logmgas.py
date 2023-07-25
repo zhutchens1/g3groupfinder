@@ -1,6 +1,12 @@
 import numpy as np
 import pred_loggs_dist as pgf # code from Eckert, K.+ 2015 (https://github.com/keckert7/codes)
 
+# note - edited Jul 21 2023 so that flag is
+# 0 = clean HI detection, strong UL, successfully deconfused
+# 1 = PGF estimate constrained by badly confused detection
+# 2 = PGF estimate constrained by weak upper limit
+# 3 = unconstrained PGF (missing HI data)
+
 def calculate_logmgas_hutchens23(mhidet,mhilim,mhicorr,emhicorr_sys,emhicorr_rand,confused,modeluj,b_a,logmstar):
     mhidet = np.array(mhidet)
     mhilim = np.array(mhilim)
@@ -21,7 +27,7 @@ def calculate_logmgas_hutchens23(mhidet,mhilim,mhicorr,emhicorr_sys,emhicorr_ran
     notempty = np.where(~np.isnan(mhicorr))
     ngal = len(mhicorr)
     deconfokay = np.zeros(ngal,dtype=bool)
-    deconfokay[notempty] = (emhicorr_sys[notempty]/mhicorr[notempty]) < 0.25
+    deconfokay[notempty] = ((emhicorr_sys[notempty]/mhicorr[notempty]) < 0.25) & (mhicorr[notempty]<=mhidet[notempty]) # added second condition 7/25/2023
     goodconf = (confused == 1) & deconfokay # successfully deconfused
     badconf = (confused == 1) & ~deconfokay # unsuccessfully deconfused
 
@@ -59,7 +65,10 @@ def calculate_logmgas_hutchens23(mhidet,mhilim,mhicorr,emhicorr_sys,emhicorr_ran
             print("This should NEVER happen")
     bestlogmhi[(badind)] = logmhiphot[(badind)]
     typeflag[(badind)] = 1 #np.ones_like(logmhiphot[(badind)])
-    bestlogmhi[np.where((badconf) & ~((1.4*mhidet/10**logmstar) > thresh) & ~np.isnan(mhicorr))] = np.log10(mhicorr[np.where((badconf) & ~((1.4*mhidet/10**logmstar) > thresh) & ~np.isnan(mhicorr))])
+    # edited below 7/25/23: don't want to use mhicorr if it is >mhidet even if 1.4mhidet/mstar>thresh.
+    # using mhidet if mhicorr is missing or bad ("bad" meaning mhicorr>mhidet)
+    bestlogmhi[np.where((badconf) & ~((1.4*mhidet/10**logmstar) > thresh) & ~np.isnan(mhicorr) & (mhicorr<=mhidet))] = np.log10(mhicorr[np.where((badconf) & ~((1.4*mhidet/10**logmstar) > thresh) & ~np.isnan(mhicorr) & (mhicorr<=mhidet))])
+    bestlogmhi[np.where((badconf) & ~((1.4*mhidet/10**logmstar) > thresh) & ~np.isnan(mhicorr) & (mhicorr>mhidet))] = np.log10(mhidet[np.where((badconf) & ~((1.4*mhidet/10**logmstar) > thresh) & ~np.isnan(mhicorr) & (mhicorr>mhidet))]) # mhicorr bad in this case
     bestlogmhi[np.where((badconf) & ~((1.4*mhidet/10**logmstar) > thresh) & np.isnan(mhicorr))] = np.log10(mhidet[np.where((badconf) & ~((1.4*mhidet/10**logmstar) > thresh) & np.isnan(mhicorr))])
 
     #################################################################
@@ -67,7 +76,7 @@ def calculate_logmgas_hutchens23(mhidet,mhilim,mhicorr,emhicorr_sys,emhicorr_ran
     # use phot-gas for missing data
     missing = (logmhi==0) #np.isnan(logmhi)
     bestlogmhi[np.where(missing)] = logmhiphot[np.where(missing)]
-    typeflag[np.where(missing)] = 1
+    typeflag[np.where(missing)] = 3 
 
     #################################################################
     #################################################################
@@ -96,7 +105,7 @@ def calculate_logmgas_hutchens23(mhidet,mhilim,mhicorr,emhicorr_sys,emhicorr_ran
         else: # this limit is so strong, might as well treat it as a number
             logmhiphot[limind[j]] = logmhi[limind[j]] # unused assignment for clarity, strong limits already set to logmhi
     bestlogmhi[np.where(weaklimit)] = logmhiphot[np.where(weaklimit)]
-    typeflag[np.where(weaklimit)] = 1
+    typeflag[np.where(weaklimit)] = 2
     return np.log10(1.4 * 10**bestlogmhi), typeflag
 
 if __name__=='__main__':
