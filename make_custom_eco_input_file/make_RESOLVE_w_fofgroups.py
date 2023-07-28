@@ -11,7 +11,9 @@ import iterativecombination as ic
 from replicate_fof_groups_katie import do_katie_HAM
 from scipy.interpolate import interp1d
 from linking_association import linking_association
+from astropy.cosmology import LambdaCDM
 
+cosmo = LambdaCDM(100.,0.3,0.7)
 
 def get_int_mag_giants(galmags, grpid, divider=-19.5):
     """
@@ -62,7 +64,7 @@ maxECOID = np.max(eco.fofgrp)
 #eco = eco[eco.absrmag<=-17.0] # commented out and moved below 4/24/23 - need subfloor galax for RESOLVE
 eco_volume = 191958.08 # (Mpc/h)^3
 resa_in_eco = eco[(eco.resname!='notinresolve')].set_index('resname')
-resa_in_eco = resa_in_eco[['fofgrp','fofgrpradeg','fofgrpdedeg','fofgrpcz','fofgrpn','fofgrpabsrmag','fofgrpgiantabsrmag','foflogmhvir','foflogmh200','fofgrpmhi','logmstarfofgrp','logmbaryfofgrp','foflogmhdyn','fofskycutoffflag']]
+resa_in_eco = resa_in_eco[['fofgrp','fofgrpradeg','fofgrpdedeg','fofgrpcz','fofgrpn','fofgrpabsrmag','fofgrpgiantabsrmag','foflogmhvir','foflogmh200','fofgrpmhi','foffc','logmstarfofgrp','logmbaryfofgrp','foflogmhdyn','fofskycutoffflag']]
 #print(resa_in_eco)
 #print('======================')
 res = res.join(resa_in_eco)
@@ -87,13 +89,13 @@ resblogmbarygrp = ic.get_int_mass(np.log10(10**resb.logmstar.to_numpy() + 10**re
 eco = eco[eco.absrmag<=-17.0] #
 ecofofid = fof.fast_fof(eco.radeg,eco.dedeg,eco.cz,0.07,1.1,sep)
 ecologmh200=np.zeros_like(ecofofid)
-haloid, tmpmass, _, _ = do_katie_HAM(eco.radeg,eco.dedeg,eco.cz,eco.absrmag,ecofofid,eco_volume)
+haloid, tmpmass, _, _ = do_katie_HAM(eco.radeg,eco.dedeg,eco.cz,eco.absrmag,ecofofid,eco_volume,cosmo)
 tmpmass = tmpmass - np.log10(0.7)
 for kk,hh in enumerate(haloid):
     ecologmh200[np.where(ecofofid==hh)]=tmpmass[kk]
 
 ecologmhvir=np.zeros_like(ecofofid)
-haloid, tmpmass, _, _ = ic.HAMwrapper(eco.radeg,eco.dedeg,eco.cz,eco.absrmag,ecofofid,eco_volume)
+haloid, tmpmass, _, _ = ic.HAMwrapper(eco.radeg,eco.dedeg,eco.cz,eco.absrmag,ecofofid,eco_volume,cosmo)
 tmpmass = tmpmass - np.log10(0.7)
 for kk,hh in enumerate(haloid):
     ecologmhvir[np.where(ecofofid==hh)]=tmpmass[kk]
@@ -124,6 +126,7 @@ resblogmhvir = logmhvirfunc(resbgrpabsrmag)
 resbdynmass = fof.dynmass(resb.radeg.to_numpy(),resb.dedeg.to_numpy(),resb.cz.to_numpy(),resbfofid,Aval=9.9,h=0.7)
 resbdynmass[np.where(resbgrpn<=7)]=-999.
 resbscflag = np.zeros(len(resbfofid))
+resbcenflag = fof.get_central_flag(resb.absrmag.to_numpy(),resbfofid)
 #plt.figure()
 #plt.scatter(ecogrpabsrmag,ecologmhvir,color='lightgreen',s=4)
 #plt.scatter(resbgrpabsrmag,resblogmhvir,color='k',s=2)
@@ -146,6 +149,7 @@ res.loc[resb_groupsel,'fofgrpgiantabsrmag']=resbgrpgiantabsrmag
 res.loc[resb_groupsel,'foflogmh200']=resblogmh200
 res.loc[resb_groupsel,'foflogmhvir']=resblogmhvir
 res.loc[resb_groupsel,'fofgrpmhi']=resbgrpmhi
+res.loc[resb_groupsel,'foffc']=resbcenflag
 res.loc[resb_groupsel,'logmstarfofgrp']=resblogmstargrp
 res.loc[resb_groupsel,'logmbaryfofgrp']=resblogmbarygrp
 res.loc[resb_groupsel,'foflogmhdyn']=resbdynmass
@@ -168,6 +172,7 @@ for subfloorname,grpidvalue in zip(subfloordwarfsB.index.to_numpy(), subfloordwa
         res.loc[fillsel,'foflogmhvir'] = res.loc[grpsel,'foflogmhvir'][0]
         res.loc[fillsel,'foflogmh200'] = res.loc[grpsel,'foflogmh200'][0]
         res.loc[fillsel,'fofgrpmhi'] = res.loc[grpsel,'fofgrpmhi'][0]
+        res.loc[fillsel,'foffc'] = 0.
         res.loc[fillsel,'logmstarfofgrp'] = res.loc[grpsel,'logmstarfofgrp'][0]
         res.loc[fillsel,'logmbaryfofgrp'] = res.loc[grpsel,'logmbaryfofgrp'][0]
         res.loc[fillsel,'foflogmhdyn'] = res.loc[grpsel,'foflogmhdyn'][0]
@@ -182,6 +187,7 @@ for subfloorname,grpidvalue in zip(subfloordwarfsB.index.to_numpy(), subfloordwa
         res.loc[fillsel,'foflogmhvir'] = extrap_func_vir(res.loc[fillsel,'absrmag'])
         res.loc[fillsel,'foflogmh200'] = extrap_func_200(res.loc[fillsel,'absrmag'])
         res.loc[fillsel,'fofgrpmhi'] = np.log10(10**res.loc[fillsel,'logmgas'] / 1.4)
+        res.loc[fillsel,'foffc'] = 1.
         res.loc[fillsel,'logmstarfofgrp'] = res.loc[fillsel,'logmstar']
         res.loc[fillsel,'logmbaryfofgrp'] = np.log10(10**res.loc[fillsel,'logmstar'] + 10**res.loc[fillsel,'logmgas'])
         res.loc[fillsel,'foflogmhdyn'] = -999.
@@ -190,4 +196,4 @@ for subfloorname,grpidvalue in zip(subfloordwarfsB.index.to_numpy(), subfloordwa
 #print(res[['absrmag','fofgrp','fofgrpn','fofgrpradeg','fofgrpdedeg','fofgrpcz','fofgrpabsrmag','fofgrpgiantabsrmag','foflogmh200','foflogmhvir','fofgrpmhi', 'logmstarfofgrp', 'logmbaryfofgrp','fofskycutoffflag']])
 
 #print(res[['absrmag','fofgrpabsrmag','fofgrpgiantabsrmag']])
-res.to_csv(".RESOLVE_DR4_groups_only.csv")
+res.loc[:,[kk for kk in res.columns if 'fof' in kk]].to_csv(".RESOLVE_DR4_groups_only.csv")

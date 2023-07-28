@@ -11,9 +11,10 @@ from splitfalsepairs import split_false_pairs
 from replicate_fof_groups_katie import do_katie_HAM
 from linking_association import linking_association
 import sys
-
+from astropy.cosmology import LambdaCDM
 
 inputfile = '.ECODR3_for_groups.csv'
+cosmo = LambdaCDM(100.,0.3,0.7)
 
 def get_int_mag_giants(galmags, grpid, divider=-19.5):
     """
@@ -57,6 +58,10 @@ def get_int_mag_giants(galmags, grpid, divider=-19.5):
 # get data needed for group finding
 #dr2 = pd.read_csv("ECODR2_050922.csv").sort_values(by='name')
 liv = pd.read_csv(inputfile).sort_values(by='name')
+for col in liv.columns:
+    unique_types = liv[col].apply(type).unique()
+    if len(unique_types)>1:
+        print('mixed types on -->',col,unique_types)
 #corr = pd.read_csv("eco_ra_dec_051922.csv").sort_values(by='name')
 
 # drop rs1492
@@ -131,12 +136,12 @@ if False:
     plt.legend(loc='best')
     plt.show()
 
-haloid, tmpmass_, _, _ = ic.HAMwrapper(radeg[grpsel], dedeg[grpsel], cz[grpsel], absrmag[grpsel], grpid[grpsel], ecovol)
+haloid, tmpmass_, _, _ = ic.HAMwrapper(radeg[grpsel], dedeg[grpsel], cz[grpsel], absrmag[grpsel], grpid[grpsel], ecovol, cosmo)
 tmpmass_ = tmpmass_ - np.log10(0.7)
 for kk,hh in enumerate(haloid):
     logmhvir[np.where(grpid==hh)] = tmpmass_[kk]
 
-haloid, tmpmass_, _, _ = do_katie_HAM(radeg[grpsel], dedeg[grpsel], cz[grpsel], absrmag[grpsel], grpid[grpsel], ecovol)
+haloid, tmpmass_, _, _ = do_katie_HAM(radeg[grpsel], dedeg[grpsel], cz[grpsel], absrmag[grpsel], grpid[grpsel], ecovol, cosmo)
 tmpmass_ = tmpmass_ - np.log10(0.7)
 for kk,hh in enumerate(haloid):
     logmh200[np.where(grpid==hh)] = tmpmass_[kk]        
@@ -178,8 +183,8 @@ resbanasep = (ecovol/len(resbana))**(1/3.)
 resbanafofid = fof.fast_fof(resbana.radeg,resbana.dedeg,resbana.cz,0.07,1.1,resbanasep)
 resbanalogmh200=np.zeros(len(resbana))
 resbanalogmh337=np.zeros(len(resbana))
-rba_haloid, tmpmass200, _, _ = do_katie_HAM(resbana.radeg,resbana.dedeg,resbana.cz,resbana.absrmag,resbanafofid,ecovol)
-rba_haloid, tmpmass337, _, _ = ic.HAMwrapper(resbana.radeg,resbana.dedeg,resbana.cz,resbana.absrmag,resbanafofid,ecovol)
+rba_haloid, tmpmass200, _, _ = do_katie_HAM(resbana.radeg,resbana.dedeg,resbana.cz,resbana.absrmag,resbanafofid,ecovol,cosmo)
+rba_haloid, tmpmass337, _, _ = ic.HAMwrapper(resbana.radeg,resbana.dedeg,resbana.cz,resbana.absrmag,resbanafofid,ecovol,cosmo)
 tmpmass200 = tmpmass200-np.log10(0.7)
 tmpmass337 = tmpmass337-np.log10(0.7)
 for kk,hh in enumerate(rba_haloid):

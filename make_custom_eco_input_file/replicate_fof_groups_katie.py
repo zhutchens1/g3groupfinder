@@ -35,7 +35,7 @@ def hubble_fof(ra,dec,cz,bperp,blos,s):
     assert np.all(np.abs(friendship-friendship.T) < 1e-8), "Friendship matrix must be symmetric."
     return fof.collapse_friendship_matrix(friendship)
 
-def do_katie_HAM(galra, galdec, galcz, galmag, galgrpid, volume,  inputfilename=None, outputfilename=None):
+def do_katie_HAM(galra, galdec, galcz, galmag, galgrpid, volume, cosmo, inputfilename=None, outputfilename=None):
     """
     Perform halo abundance matching on a galaxy group catalog (wrapper around the C code of A.A. Berlind).
 
@@ -76,9 +76,9 @@ def do_katie_HAM(galra, galdec, galcz, galmag, galgrpid, volume,  inputfilename=
     delinfile=(inputfilename==None)
     # Prepare inputs
     grpra, grpdec, grpcz = fof.group_skycoords(galra, galdec, galcz, galgrpid)
-    if (galmag<0).all():
+    if (galmag<=0).all():
         grpmag = ic.get_int_mag(galmag, galgrpid)
-    elif (galmag>0).all():
+    elif (galmag>=0).all():
         grpmag = -1*ic.get_int_mass(galmag, galgrpid) # need -1 to trick Andreas' HAM code into using masses.
     grprproj, grpsigma = fof.get_rproj_czdisp(galra, galdec, galcz, galgrpid)
     # Reshape them to match len grps
@@ -182,7 +182,7 @@ if __name__=='__main__':
         plt.legend(loc='best')
         plt.show()
 
-    haloid, tmpmass_, _, _ = do_katie_HAM(radeg[grpsel], dedeg[grpsel], cz[grpsel], absrmag[grpsel], grpid[grpsel], ecovol)
+    haloid, tmpmass_, _, _ = do_katie_HAM(radeg[grpsel], dedeg[grpsel], cz[grpsel], absrmag[grpsel], grpid[grpsel], cosmo, ecovol)
     tmpmass_ = tmpmass_ - np.log10(0.7)
     #tmpmass_ = np.log10(10**tmpmass_ / fof.getmhoffset(200,280,1,1,6))
     for kk,hh in enumerate(haloid):

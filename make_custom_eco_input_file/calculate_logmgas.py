@@ -1,6 +1,6 @@
 import numpy as np
 import pred_loggs_dist as pgf # code from Eckert, K.+ 2015 (https://github.com/keckert7/codes)
-
+import matplotlib.pyplot as plt
 # note - edited Jul 21 2023 so that flag is
 # 0 = clean HI detection, strong UL, successfully deconfused
 # 1 = PGF estimate constrained by badly confused detection

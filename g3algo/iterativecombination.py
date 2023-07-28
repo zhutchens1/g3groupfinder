@@ -2,6 +2,7 @@ import numpy as np
 import pandas as pd
 import pickle
 from scipy.spatial import cKDTree
+from scipy.interpolate import UnivariateSpline
 from copy import deepcopy
 import matplotlib.pyplot as plt
 import time
@@ -9,6 +10,7 @@ import os
 import subprocess
 import sys
 from IPython import get_ipython
+from astropy.cosmology import LambdaCDM, z_at_value
 ipython = get_ipython()
 
 
@@ -17,7 +19,7 @@ Zackary Huthens - zhutchen [at] live.unc.edu
 University of North Carolina at Chapel Hill
 """
 
-def iterative_combination(galaxyra, galaxydec, galaxycz, galaxymag, rprojboundary, vprojboundary, centermethod, decisionmode, starting_id=1, H0=100.):
+def iterative_combination(galaxyra, galaxydec, galaxycz, galaxymag, rprojboundary, vprojboundary, centermethod, decisionmode, starting_id=1, H0=100., Om0=0.3, Ode0=0.7):
     """
     Perform iterative combination on a list of input galaxies.
     
@@ -44,6 +46,7 @@ def iterative_combination(galaxyra, galaxydec, galaxycz, galaxymag, rprojboundar
     -----------
     itassocid: Group ID numbers for every input galaxy. Shape matches `galaxyra`.
     """
+    cosmo = LambdaCDM(H0=H0, Om0=Om0, Ode0=Ode0)
     print("Beginning iterative combination...")
     # Check user input
     assert (callable(rprojboundary) and callable(vprojboundary)),"Inputs `rprojboundary` and `vprojboundary` must be callable."
@@ -61,7 +64,7 @@ def iterative_combination(galaxyra, galaxydec, galaxycz, galaxymag, rprojboundar
         print("iteration {} in progress...".format(niter))
         # Compute based on updated ID number
         olditassocid = itassocid
-        itassocid = nearest_neighbor_assign(galaxyra, galaxydec, galaxycz, galaxymag, olditassocid, rprojboundary, vprojboundary, centermethod, decisionmode, H0=H0)
+        itassocid = nearest_neighbor_assign(galaxyra, galaxydec, galaxycz, galaxymag, olditassocid, rprojboundary, vprojboundary, centermethod, decisionmode, cosmo)
         # check for convergence
         converged = np.array_equal(olditassocid, itassocid)
         niter+=1
@@ -76,7 +79,7 @@ def iterative_combination(galaxyra, galaxydec, galaxycz, galaxymag, rprojboundar
 # ------------------------------------------------------------------------------------------#
 
 
-def group_skycoords(galaxyra, galaxydec, galaxycz, galaxygrpid):
+def group_skycoords(galaxyra, galaxydec, galaxycz, galaxygrpid, cosmo):
     """
     -----
     Obtain a list of group centers (RA/Dec/cz) given a list of galaxy coordinates (equatorial)
@@ -115,6 +118,7 @@ def group_skycoords(galaxyra, galaxydec, galaxycz, galaxygrpid):
     groupra = np.zeros(ngalaxies)
     groupdec = np.zeros(ngalaxies)
     groupcz = np.zeros(ngalaxies)
+    czfinder = lambda distMpc: 3e5*z_at_value((lambda xx: cosmo.comoving_distance(xx).to_value()), distMpc, method='bounded').to_value()
     for i,uid in enumerate(uniqidnumbers):
         sel=np.where(galaxygrpid==uid)
         nmembers = len(galaxygrpid[sel])
@@ -139,10 +143,26 @@ def group_skycoords(galaxyra, galaxydec, galaxycz, galaxygrpid):
         groupra[sel] = racen # in degrees
         groupdec[sel] = deccen # in degrees
         groupcz[sel] = czcen
+        #xcen2 = np.sum(cosmo.comoving_distance(galaxycz[sel]/3e5).to_value()*galaxyx[sel])/nmembers
+        #ycen2 = np.sum(cosmo.comoving_distance(galaxycz[sel]/3e5).to_value()*galaxyy[sel])/nmembers
+        #zcen2 = np.sum(cosmo.comoving_distance(galaxycz[sel]/3e5).to_value()*galaxyz[sel])/nmembers
+        #dcenter = np.sqrt(xcen2*xcen2 + ycen2*ycen2 + zcen2*zcen2)
+        #deccenter2 = np.arcsin(zcen2/dcenter)*(180.0/np.pi)
+        #phicorr = 0.0*int((ycen2 >=0 and xcen2 >=0)) + 180.0*int((ycen2 < 0 and xcen2 < 0) or (ycen2 >= 0 and xcen2 < 0)) + 360.0*int((ycen2 < 0 and xcen2 >=0))
+        #racenter2 = np.arctan(ycen2/xcen2)*(180.0/np.pi)+phicorr
+        #if len(galaxyz[sel])==1:
+        #    czcenter2 = galaxycz[sel]
+        #else:
+        #    czcenter2 = czfinder(dcenter)
+        #if nmembers>2:
+        #    print('test z_at_value :)') 
+        #    print(racen,racenter2)
+        #    print(deccen,deccenter2)
+        #    print(czcen,czcenter2)
     return groupra, groupdec, groupcz
 
 
-def nearest_neighbor_assign(galaxyra, galaxydec, galaxycz, galaxymag, grpid, rprojboundary, vprojboundary, centermethod, decisionmode, H0):
+def nearest_neighbor_assign(galaxyra, galaxydec, galaxycz, galaxymag, grpid, rprojboundary, vprojboundary, centermethod, decisionmode, cosmo):
     """
     For a list of galaxies defined by groups, refine group ID numbers using a nearest-neighbor
     search and applying the search boundaries.
@@ -170,7 +190,7 @@ def nearest_neighbor_assign(galaxyra, galaxydec, galaxycz, galaxymag, grpid, rpr
     # Prepare output array
     associd = deepcopy(grpid)
     # Get the group RA/Dec/cz for every galaxy
-    groupra, groupdec, groupcz = group_skycoords(galaxyra, galaxydec, galaxycz, grpid) 
+    groupra, groupdec, groupcz = group_skycoords(galaxyra, galaxydec, galaxycz, grpid, cosmo) 
     # Get unique potential groups
     uniqgrpid, uniqind = np.unique(grpid, return_index=True)
     potra, potdec, potcz = groupra[uniqind], groupdec[uniqind], groupcz[uniqind] 
@@ -180,9 +200,10 @@ def nearest_neighbor_assign(galaxyra, galaxydec, galaxycz, galaxymag, grpid, rpr
     #zmpc = potcz/H0
     #xmpc = 2.*np.pi*zmpc*potra*np.cos(np.pi*potdec/180.) / 360.
     #ympc = np.float64(2.*np.pi*zmpc*potdec / 360.)
-    zmpc = potcz/H0 * np.cos(pottheta) 
-    xmpc = potcz/H0*np.sin(pottheta)*np.cos(potphi)
-    ympc = potcz/H0*np.sin(pottheta)*np.sin(potphi)
+    dist = cosmo.comoving_distance(potcz/3e5).to_value() # Mpc, previously potcz/H0
+    zmpc = dist * np.cos(pottheta) 
+    xmpc = dist * np.sin(pottheta)*np.cos(potphi)
+    ympc = dist * np.sin(pottheta)*np.sin(potphi)
     coords = np.array([xmpc, ympc, zmpc]).T
     kdt = cKDTree(coords)
     nndist, nnind = kdt.query(coords,k=2)
@@ -200,7 +221,7 @@ def nearest_neighbor_assign(galaxyra, galaxydec, galaxycz, galaxymag, grpid, rpr
         combinedra,combineddec,combinedcz = np.hstack((galaxyra[Gpgalsel],galaxyra[GNNgalsel])),np.hstack((galaxydec[Gpgalsel],galaxydec[GNNgalsel])),np.hstack((galaxycz[Gpgalsel],galaxycz[GNNgalsel]))
         combinedmag = np.hstack((galaxymag[Gpgalsel], galaxymag[GNNgalsel]))
         combinedgalgrpid = np.hstack((grpid[Gpgalsel],grpid[GNNgalsel]))
-        if fit_in_group(combinedra, combineddec, combinedcz, combinedgalgrpid, combinedmag, rprojboundary, vprojboundary, centermethod, decisionmode, H0) and (not alreadydone[idx]) and (not alreadydone[nbridx]):
+        if fit_in_group(combinedra, combineddec, combinedcz, combinedgalgrpid, combinedmag, rprojboundary, vprojboundary, centermethod, decisionmode, cosmo) and (not alreadydone[idx]) and (not alreadydone[nbridx]):
             # check for reciprocity: is the nearest-neighbor of GNN Gp? If not, leave them both as they are and let it be handled during the next iteration.
             nbrnnidx = nnind[nbridx]
             if idx==nbrnnidx:
@@ -215,7 +236,7 @@ def nearest_neighbor_assign(galaxyra, galaxydec, galaxycz, galaxymag, grpid, rpr
     return associd  
 
 
-def fit_in_group(galra, galdec, galcz, galgrpid, galmag, rprojboundary, vprojboundary, center='arithmetic', decisionmode = 'allgalaxies', H0=100.):
+def fit_in_group(galra, galdec, galcz, galgrpid, galmag, rprojboundary, vprojboundary, center='arithmetic', decisionmode = 'allgalaxies', cosmo = LambdaCDM(100.,0.3,0.7)):
     """
     Check whether two potential groups can be merged based on the integrated luminosity of the 
     potential members, given limiting input group sizes.
@@ -241,9 +262,9 @@ def fit_in_group(galra, galdec, galcz, galgrpid, galmag, rprojboundary, vprojbou
     fitingroup : bool
         Bool indicating whether the series of input galaxies can be merged into a single group of the specified size.
     """
-    if (galmag<0).all():
+    if (galmag<=0).all():
         memberintmag = get_int_mag(galmag, np.full(len(galmag), 1))
-    elif (galmag>0).all():
+    elif (galmag>=0).all():
         memberintmag = get_int_mass(galmag, np.full(len(galmag), 1))
     if decisionmode=='allgalaxies':
         grpn = len(galra)
@@ -253,6 +274,8 @@ def fit_in_group(galra, galdec, galcz, galgrpid, galmag, rprojboundary, vprojbou
         galy = np.sin(galtheta)*np.sin(galphi)
         galz = np.cos(galtheta)
         if center=='arithmetic':
+            print("WARNING: code below not corrected to cosmology???")
+            print('arithmetic')
             xcen = np.sum(galcz*galx)/grpn
             ycen = np.sum(galcz*galy)/grpn
             zcen = np.sum(galcz*galz)/grpn
@@ -260,7 +283,21 @@ def fit_in_group(galra, galdec, galcz, galgrpid, galmag, rprojboundary, vprojbou
             deccenter = np.arcsin(zcen/czcenter)*(180.0/np.pi)
             phicorr = 0.0*int((ycen >=0 and xcen >=0)) + 180.0*int((ycen < 0 and xcen < 0) or (ycen >= 0 and xcen < 0)) + 360.0*int((ycen < 0 and xcen >=0))
             racenter = np.arctan(ycen/xcen)*(180.0/np.pi)+phicorr
+
+            xcen2 = np.sum(cosmo.comoving_distance(galcz/3e5).to_value()*galx)/grpn
+            ycen2 = np.sum(cosmo.comoving_distance(galcz/3e5).to_value()*galy)/grpn
+            zcen2 = np.sum(cosmo.comoving_distance(galcz/3e5).to_value()*galz)/grpn
+            dcenter = np.sqrt(xcen2*xcen2 + ycen2*ycen2 + zcen2*zcen2)
+            deccenter2 = np.arcsin(zcen/czcenter)*(180.0/np.pi)
+            phicorr = 0.0*int((ycen >=0 and xcen >=0)) + 180.0*int((ycen < 0 and xcen < 0) or (ycen >= 0 and xcen < 0)) + 360.0*int((ycen < 0 and xcen >=0))
+            racenter2 = np.arctan(ycen/xcen)*(180.0/np.pi)+phicorr
+            czcenter2 = 3e5*z_at_value(cosmo.comoving_distance, dcenter)
+            print(racenter,racenter2)
+            print(deccenter,deccenter2)
+            print(czcenter,czcenter2)
         elif center=='luminosity':
+            print("WARNING: code below not corrected to cosmology???")
+            print('lum')
             unlogmag = 10**(-0.4*galmag)
             xcen = np.sum(galcz*galx*unlogmag)/np.sum(unlogmag)
             ycen = np.sum(galcz*galy*unlogmag)/np.sum(unlogmag)
@@ -271,20 +308,22 @@ def fit_in_group(galra, galdec, galcz, galgrpid, galmag, rprojboundary, vprojbou
             racenter = np.arctan(ycen/xcen)*(180.0/np.pi)+phicorr
         # check if all members are within rproj and vproj of group center
         halfangle = angular_separation(racenter,deccenter,galra[:,None],galdec[:,None])/2.0
-        rprojsep = (galcz[:,None]+czcenter)/H0 * halfangle
+        __old_rprojsep = (galcz[:,None]+czcenter)/H0 * halfangle
+        rprojsep = (cosmo.comoving_transverse_distance(galcz/3e5).to_value()[:,None]+cosmo.comoving_transverse_distance(czcenter/3e5).to_value())*halfangle
+        print("ic.py: checking projected sep vals: ", rprojsep,__old_rprojsep)
         lossep = np.abs(galcz[:,None]-czcenter)
         fitingroup=(np.all(rprojsep<rprojboundary(memberintmag)) and np.all(lossep<vprojboundary(memberintmag)))
     elif decisionmode=='centers':
         uniqIDnums = np.unique(galgrpid)
         assert len(uniqIDnums)==2, "galgrpid must have two unique entries (two seed groups)."
         seed1sel = (galgrpid==uniqIDnums[0])
-        seed1grpra,seed1grpdec,seed1grpcz = group_skycoords(galra[seed1sel],galdec[seed1sel],galcz[seed1sel],galgrpid[seed1sel])
+        seed1grpra,seed1grpdec,seed1grpcz = group_skycoords(galra[seed1sel],galdec[seed1sel],galcz[seed1sel],galgrpid[seed1sel], cosmo)
         seed2sel = (galgrpid==uniqIDnums[1])
-        seed2grpra,seed2grpdec,seed2grpcz = group_skycoords(galra[seed2sel],galdec[seed2sel],galcz[seed2sel],galgrpid[seed2sel])
-        allgrpra,allgrpdec,allgrpcz = group_skycoords(galra, galdec, galcz, np.zeros_like(galra)) # center of all galaxies
-        seed1radialsep = (seed1grpcz[0]+allgrpcz[0])/H0 * np.sin(angular_separation(allgrpra[0],allgrpdec[0],seed1grpra[0],seed1grpdec[0])/2.)
+        seed2grpra,seed2grpdec,seed2grpcz = group_skycoords(galra[seed2sel],galdec[seed2sel],galcz[seed2sel],galgrpid[seed2sel], cosmo)
+        allgrpra,allgrpdec,allgrpcz = group_skycoords(galra, galdec, galcz, np.zeros_like(galra), cosmo) # center of all galaxies
+        seed1radialsep = (cosmo.comoving_transverse_distance(seed1grpcz[0]/3e5).to_value()+cosmo.comoving_transverse_distance(allgrpcz[0]/3e5).to_value())*(angular_separation(allgrpra[0],allgrpdec[0],seed1grpra[0],seed1grpdec[0])/2.)
         seed1lossep = np.abs(seed1grpcz[0]-allgrpcz[0])
-        seed2radialsep = (seed2grpcz[0]+allgrpcz[0])/H0 * np.sin(angular_separation(allgrpra[0],allgrpdec[0],seed2grpra[0],seed2grpdec[0])/2.)
+        seed2radialsep = (cosmo.comoving_transverse_distance(seed2grpcz[0]/3e5).to_value()+cosmo.comoving_transverse_distance(allgrpcz[0]/3e5).to_value())*(angular_separation(allgrpra[0],allgrpdec[0],seed2grpra[0],seed2grpdec[0])/2.)
         seed2lossep = np.abs(seed2grpcz[0]-allgrpcz[0])
         fitingroup1 = (seed1radialsep<rprojboundary(memberintmag)).all() and (seed1lossep<vprojboundary(memberintmag)).all()
         fitingroup2 = (seed2radialsep<rprojboundary(memberintmag)).all() and (seed2lossep<vprojboundary(memberintmag)).all()
@@ -434,7 +473,7 @@ def get_int_mass(galmass, grpid):
         grpmass[sel]=totalmass
     return grpmass
 
-def HAMwrapper(galra, galdec, galcz, galmag, galgrpid, volume,  inputfilename=None, outputfilename=None):
+def HAMwrapper(galra, galdec, galcz, galmag, galgrpid, volume, cosmo, inputfilename=None, outputfilename=None):
     """
     Perform halo abundance matching on a galaxy group catalog (wrapper around the C code of A.A. Berlind).
 
@@ -474,12 +513,12 @@ def HAMwrapper(galra, galdec, galcz, galmag, galgrpid, volume,  inputfilename=No
     deloutfile=(outputfilename==None)
     delinfile=(inputfilename==None)
     # Prepare inputs
-    grpra, grpdec, grpcz = group_skycoords(galra, galdec, galcz, galgrpid)
-    if (galmag<0).all():
+    grpra, grpdec, grpcz = group_skycoords(galra, galdec, galcz, galgrpid, cosmo)
+    if (galmag<=0).all():
         grpmag = get_int_mag(galmag, galgrpid)
-    elif (galmag>0).all():
+    elif (galmag>=0).all():
         grpmag = -1*get_int_mass(galmag, galgrpid) # need -1 to trick Andreas' HAM code into using masses.
-    grprproj, grpsigma = get_rproj_czdisp(galra, galdec, galcz, galgrpid)
+    grprproj, grpsigma = np.zeros_like(galra),np.zeros_like(galra)#get_rproj_czdisp(galra, galdec, galcz, galgrpid)
     # Reshape them to match len grps
     uniqgrpid, uniqind = np.unique(galgrpid, return_index=True)
     grpra=grpra[uniqind]
@@ -547,7 +586,7 @@ def get_rproj_czdisp(galaxyra, galaxydec, galaxycz, galaxygrpid, H0=100.):
     galaxygrpid=np.asarray(galaxygrpid)
     rproj=np.zeros(len(galaxyra))
     vdisp=np.zeros(len(galaxyra))
-    grpra, grpdec, grpcz = group_skycoords(galaxyra, galaxydec, galaxycz, galaxygrpid)
+    grpra, grpdec, grpcz = group_skycoords(galaxyra, galaxydec, galaxycz, galaxygrpid, cosmo)
     grpra = grpra*np.pi/180. #convert  everything to radians
     galaxyra=galaxyra*np.pi/180.
     galaxydec=galaxydec*np.pi/180.

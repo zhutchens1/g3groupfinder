@@ -12,18 +12,25 @@ from scipy.interpolate import interp1d, UnivariateSpline
 from lss_dens import lss_dens_by_galaxy
 import virtools as vz
 from replicate_fof_groups_katie import do_katie_HAM
+from astropy.cosmology import LambdaCDM
 
 if __name__=='__main__':
+    eco_inputpath = '../make_custom_eco_input_file/eco_dr3_base_071223.csv'
+    res_inputpath = '../make_custom_eco_input_file/res_dr4_base_071223.csv'
+
     hubble_const = 70.
+    omega_m = 0.3
+    omega_de = 0.7
+    cosmo=LambdaCDM(hubble_const, omega_m, omega_de)
     ecovolume = 191958.08 / (hubble_const/100.)**3.
     gfargseco = dict({'volume':ecovolume,'rproj_fit_multiplier':3,'vproj_fit_multiplier':4,'vproj_fit_offset':200,\
            'gd_rproj_fit_multiplier':2, 'gd_vproj_fit_multiplier':4, 'gd_vproj_fit_offset':100,\
            'gd_fit_bins':np.arange(-24,-19,0.25), 'gd_rproj_fit_guess':[1e-5, 0.4],\
-           'gd_vproj_fit_guess':[3e-5,4e-1], 'H0':hubble_const, 'iterative_giant_only_groups':True, 'ic_decision_mode':'centers'})
+           'gd_vproj_fit_guess':[3e-5,4e-1], 'H0':hubble_const, 'Om0':omega_m, 'Ode0':omega_de,  'iterative_giant_only_groups':True, 'ic_decision_mode':'centers'})
     ########################
     # Group Finding: ECO
     ########################
-    eco = pd.read_csv("../make_custom_eco_input_file/eco_custom_input_052523.csv")
+    eco = pd.read_csv(eco_inputpath)
     eco = eco[eco.resname!='rs1492'] # removing rs1492
     ecogroupsel = (eco.absrmag<=-17.33)
     eco.loc[:,'logmbary'] = np.log10(10**eco.logmstar+10**eco.logmgas)
@@ -45,7 +52,7 @@ if __name__=='__main__':
     ecog3logmh200 = np.zeros_like(ecog3grpid)-999.
     ecohamsel = (eco.absrmag.to_numpy()<=-17.33)#(ecog3grpid!=-999.) # this no longer works because g3grpid goes below floor.
     haloid, halomass, junk, junk = ic.HAMwrapper(eco.radeg[ecohamsel].to_numpy(), eco.dedeg[ecohamsel].to_numpy(), eco.cz[ecohamsel].to_numpy(),\
-         eco.absrmag[ecohamsel].to_numpy(), eco.g3grp_l[ecohamsel].to_numpy(), ecovolume*(hubble_const/100.)**3., inputfilename=None, outputfilename=None)
+         eco.absrmag[ecohamsel].to_numpy(), eco.g3grp_l[ecohamsel].to_numpy(), ecovolume*(hubble_const/100.)**3., cosmo, inputfilename=None, outputfilename=None)
     junk, uniqindex = np.unique(ecog3grpid[ecohamsel], return_index=True)
     halomass = halomass-np.log10(hubble_const/100.)
     for i,idv in enumerate(haloid):
@@ -218,15 +225,14 @@ if __name__=='__main__':
     ##########################
     # Group Finding: RESOLVE
     ##########################
-    resolve = pd.read_csv('/srv/two/cielo/zhutchen/database/add_rs1519_resolve/RESOLVE_preupload_051123.csv')
+    resolve = pd.read_csv(res_inputpath)
     resolve = resolve[resolve.name!='rs1492'] # remove rs1492
-    print('currently using pre-upload version of RESOLVE 5/11/2023!')
     resolve.loc[:,'logmbary']=np.log10(10**resolve.logmstar+10**resolve.logmgas)
     resolveg3grpid=np.zeros(len(resolve))-999.
     resolveg3logmh=np.zeros(len(resolve))-999.
     resolveg3logmh200=np.zeros(len(resolve))-999.
     # RESOLVE-B analogue group finding + HAM
-    resbana = pd.read_csv("ECOdata_080822.csv")
+    resbana = pd.read_csv(eco_inputpath)
     resbana=resbana[(resbana.absrmag<=-17.0)]
     resbanag3grpid, _, resbana_fofsep, resbana_rproj_fit_params, _, resbana_vproj_fit_params, _, resbana_gd_rproj_fit_params, _, resbana_gd_vproj_fit_params, _ = g3gf(resbana.radeg,resbana.dedeg, resbana.cz, resbana.absrmag,-19.5, **gfargseco)
     resbana.loc[:,'g3grp_l'] = resbanag3grpid
@@ -234,7 +240,7 @@ if __name__=='__main__':
     resbanag3logmh200 = np.zeros_like(resbanag3grpid)-999.
     resbanahamsel = (resbanag3grpid>0)
     haloid, halomass, junk, junk = ic.HAMwrapper(resbana.radeg[resbanahamsel].to_numpy(), resbana.dedeg[resbanahamsel].to_numpy(), resbana.cz[resbanahamsel].to_numpy(),\
-         resbana.absrmag[resbanahamsel].to_numpy(), resbana.g3grp_l[resbanahamsel].to_numpy(), ecovolume*(hubble_const/100.)**3., inputfilename=None, outputfilename=None)
+         resbana.absrmag[resbanahamsel].to_numpy(), resbana.g3grp_l[resbanahamsel].to_numpy(), ecovolume*(hubble_const/100.)**3., cosmo, inputfilename=None, outputfilename=None)
     junk, uniqindex = np.unique(resbanag3grpid[resbanahamsel], return_index=True)
     halomass = halomass-np.log10(hubble_const/100.)
     for i,idv in enumerate(haloid):
@@ -244,7 +250,7 @@ if __name__=='__main__':
     resbanaintmag = ic.get_int_mag(resbana.absrmag.to_numpy(),resbana.g3grp_l.to_numpy())
     resbanagiantintmag = ic.get_int_mag_giants(resbana.absrmag.to_numpy(),resbana.g3grp_l.to_numpy())
     _,uniqidx=np.unique(resbana.g3grp_l.to_numpy(),return_index=True)
-    mhspline = interp1d(resbanaintmag[uniqidx],resbanag3logmh[uniqidx])
+    mhspline = interp1d(resbanaintmag[uniqidx],resbanag3logmh[uniqidx], fill_value='extrapolate')
     tmp = pd.DataFrame(np.array([resbanaintmag[uniqidx],resbanag3logmh[uniqidx]]).T,columns=['grprmag','logmh']).sort_values(by='grprmag')
     tmp = tmp[tmp.grprmag>-19.5].tail(100)
     params_ = np.polyfit(tmp.grprmag,tmp.logmh,1)
@@ -263,7 +269,7 @@ if __name__=='__main__':
     resbana.loc[:,'g3logmh200_l'] = resbanag3logmh200
     resbanaintmag = ic.get_int_mag(resbana.absrmag.to_numpy(),resbana.g3grp_l.to_numpy())
     _,uniqidx=np.unique(resbana.g3grp_l.to_numpy(),return_index=True)
-    mhspline200 = interp1d(resbanaintmag[uniqidx],resbanag3logmh200[uniqidx])
+    mhspline200 = interp1d(resbanaintmag[uniqidx],resbanag3logmh200[uniqidx], fill_value='extrapolate')
     tmp = pd.DataFrame(np.array([resbanaintmag[uniqidx],resbanag3logmh200[uniqidx]]).T,columns=['grprmag','logmh200']).sort_values(by='grprmag')
     tmp = tmp[tmp.grprmag>-19.5].tail(100)
     params200_ = np.polyfit(tmp.grprmag,tmp.logmh200,1)
