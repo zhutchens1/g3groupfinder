@@ -385,9 +385,36 @@ class g3groupfinder:
         dwarf_only_grpid = dwarfOnlyICRoutine(self.radeg[self.ungrouped_sel], self.dedeg[self.ungrouped_sel], self.z[self.ungrouped_sel], \
                            self.absrmag[self.ungrouped_sel], self.gd_rproj_boundary, self.gd_vproj_boundary, startID, self.cosmo)
         self.g3grpid[self.ungrouped_sel] = dwarf_only_grpid
+
+    def getCatalog(self, by='galaxy'):
+        """
+        Return a group catalog containing group IDs, group centers,
+        integrated luminosities, and group N.
+
+        Parameters
+        ---------------------
+        by : str
+            If 'galaxy' (default), the group catalog info is returned on a galaxy-by-
+            galaxy basis matching the order of the input galaxies.
+            If 'group', it is returned group-by-group.
         
-        
-        
+        Returns
+        ---------------------
+        catalog : numpy array
+            Group catalog with columns [grpID, grpRA, grpDEC, grpz, grpN, grpAbsMag].
+        """
+        grpra, grpdec, grpz = group_skycoords(self.radeg, self.dedeg, self.z, self.g3grpid)
+        grpn = multiplicity_function(self.g3grpid, True)
+        grpM = get_int_mag(self.absrmag, self.g3grpid)
+        catalog = np.array([self.g3grpid, grpra, grpdec, grpz, grpn, grpM]).T
+        if by == 'galaxy':
+            return catalog
+        elif by == 'group':
+            _, uniqind = np.unique(self.g3grpid, return_index=True)
+            return catalog[uniqind]
+        else:
+            raise ValueError(f"Parameter `by` must be 'galaxy' or 'group', not '{by}'.")
+            
 # ------------------------------------------------------------------------------ #
 # ------------------------------------------------------------------------------ #
 # test
@@ -405,14 +432,15 @@ if __name__=='__main__':
     g3.deriveDwarfBoundaries(gd_rproj_fit_multiplier=2, gd_vproj_fit_multiplier=4, gd_vproj_fit_offs=100, gd_fit_bins=np.arange(-24,-19,0.25))
     #g3.plotDwarfBoundaries(show=True, rproj_xlim=(-17,-24), rproj_ylim=(0,0.8), vproj_xlim=(-17,-24), vproj_ylim=(0,800))
     g3.findDwarfOnlyGroups()
+    cat = g3.getCatalog(by='galaxy')
 
-    #grpn = multiplicity_function(g3.g3grpid, False)
-    #grpn_true = multiplicity_function(df.g3grp_l, False)
-    #plt.figure()
-    #plt.hist(grpn, bins=np.arange(0.5,400.5,1))
-    #plt.hist(grpn_true, bins=np.arange(0.5,400.5,1), histtype='step', color='k', label='h23')
-    #plt.yscale('log')
-    #plt.legend(loc='best')
-    #plt.show()
+    grpn = multiplicity_function(g3.g3grpid, False)
+    grpn_true = multiplicity_function(df.g3grp_l, False)
+    plt.figure()
+    plt.hist(grpn, bins=np.arange(0.5,400.5,1))
+    plt.hist(grpn_true, bins=np.arange(0.5,400.5,1), histtype='step', color='k', label='h23')
+    plt.yscale('log')
+    plt.legend(loc='best')
+    plt.show()
 
     #exit()
