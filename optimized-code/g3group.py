@@ -10,7 +10,7 @@ from dwarfassoc import dwarfAssocRoutine
 from dwarfonlyic import dwarfOnlyICRoutine
 from g3misc import *
 
-import sys
+#import sys
 #sys.path.insert(0,'../g3algo/')
 #import iterativecombination as ic
 #from giantonlyic import iterative_combination_giants
@@ -89,10 +89,10 @@ class g3groupfinder:
         self.fof_blos = fof_blos
         self.fof_sep = fof_sep
         self.volume = volume
-        if fof_sep is not None:
+        if self.fof_sep is not None:
             pass
         else:
-            fof_sep = (self.volume/np.sum(self.giantsel))**(1/3.)
+            self.fof_sep = (self.volume/np.sum(self.giantsel))**(1/3.)
         self.giantfofid = kdFOF(self.radeg[self.giantsel],self.dedeg[self.giantsel],self.z[self.giantsel],\
             self.fof_bperp,self.fof_blos,self.fof_sep,self.cosmo)
         self.g3grpid[self.giantsel] = self.giantfofid
