@@ -7,6 +7,7 @@ from astropy.cosmology import LambdaCDM
 from kdfof import kdFOF
 from giantonlyic import giantOnlyICRoutine
 from dwarfassoc import dwarfAssocRoutine
+from dwarfonlyic import dwarfOnlyICRoutine
 from g3misc import *
 
 import sys
@@ -381,8 +382,8 @@ class g3groupfinder:
         startID = np.max(self.g3grpid)+1
         grpn_after_assoc = multiplicity_function(self.g3grpid, True)
         self.ungrouped_sel = (grpn_after_assoc == 1) & self.dwarfsel
-        dwarf_only_grpid = dwarfICRoutine(self.radeg[self.ungrouped_sel], self.dedeg[self.ungrouped_sel], self.z[self.ungrouped_sel], \
-                           self.absrmag[self.ungrouped_sel], self.gd_rproj_boundary, self.gd_vproj_boundary, starting_id=startID, self.cosmo)
+        dwarf_only_grpid = dwarfOnlyICRoutine(self.radeg[self.ungrouped_sel], self.dedeg[self.ungrouped_sel], self.z[self.ungrouped_sel], \
+                           self.absrmag[self.ungrouped_sel], self.gd_rproj_boundary, self.gd_vproj_boundary, startID, self.cosmo)
         self.g3grpid[self.ungrouped_sel] = dwarf_only_grpid
         
         
@@ -402,7 +403,8 @@ if __name__=='__main__':
     g3.giantOnlyMerging()
     g3.dwarfAssoc()
     g3.deriveDwarfBoundaries(gd_rproj_fit_multiplier=2, gd_vproj_fit_multiplier=4, gd_vproj_fit_offs=100, gd_fit_bins=np.arange(-24,-19,0.25))
-    g3.plotDwarfBoundaries(show=True, rproj_xlim=(-17,-24), rproj_ylim=(0,0.8), vproj_xlim=(-17,-24), vproj_ylim=(0,800))
+    #g3.plotDwarfBoundaries(show=True, rproj_xlim=(-17,-24), rproj_ylim=(0,0.8), vproj_xlim=(-17,-24), vproj_ylim=(0,800))
+    g3.findDwarfOnlyGroups()
 
     #grpn = multiplicity_function(g3.g3grpid, False)
     #grpn_true = multiplicity_function(df.g3grp_l, False)
@@ -413,4 +415,4 @@ if __name__=='__main__':
     #plt.legend(loc='best')
     #plt.show()
 
-    exit()
+    #exit()

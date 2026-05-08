@@ -5,63 +5,64 @@ from g3misc import *
 SPEED_OF_LIGHT = 3.0e5
 
 #
-# Python code for the giant-only merging subroutine
+# Python code for the dwarf-only group-finding routine
 # from Hutchens et al. 2023 / 2023ApJ...956...51H
 #
 
-def giantOnlyICRoutine(galaxyra, galaxydec, galaxyz, giantfofid, rprojboundary, vprojboundary, cosmo):
+def dwarfOnlyICRoutine(galaxyra, galaxydec, galaxyz, galaxyabsmag, rprojboundary, vprojboundary, starting_id, cosmo):
     """
-    Iteratively combine giant-only FoF groups using group N_giants-based boundaries.
+    Construct dwarf-only groups via iterative combination.
 
     Parameters
     --------------
     galaxyra : array_like
-        RA of giant galaxies in decimal degrees.
+        RA of galaxies in decimal degrees.
     galaxydec : array_like
-        Dec of giant galaxies in decimal degrees.
+        Dec of galaxies in decimal degrees.
     galaxyz : array_like
-        Redshift of giant galaxies.
-    giantfofid : array_like
-        FoF group ID for each giant galaxy, length matches `galaxyra`.
+        Redshift of galaxies.
+    galaxyabsmag : array_like
+        Absolute magnitudes of galaxies.
     rprojboundary : callable
-        Search boundary to apply on-sky. Should be callable function of group N_giants.
+        Search boundary to apply on-sky. Should be callable function of group integrated luminosity..
         Units: Mpc consistent with `cosmo`.
     vprojboundary : callable
-        Search boundary to apply in line-of-sight. Should be callable function of group N_giants.
+        Search boundary to apply in line-of-sight. Should be callable function of group integrated luminosity.
         Units: km/s
+    starting_id : int
+        Group ID to start at (to avoid overwriting existing group IDs for giant-hosting systems).
     cosmo : astropy.cosmology object
        Astropy cosmology for computing cosmological distances.
     
     Returns
     --------------
-    giantgroupid : np.array
+    dwarfgroupid : np.array
         Array of group ID numbers following iterative combination.
-        Unique values match that of `giantfofid`.
     """
     galaxyra=np.asarray(galaxyra)
     galaxydec=np.asarray(galaxydec)
     galaxyz=np.asarray(galaxyz)
-    giantfofid=np.asarray(giantfofid)
-    assert callable(rprojboundary),"Argument `rprojboundary` must callable function of N_giants."
-    assert callable(vprojboundary),"Argument `vprojboundary` must callable function of N_giants."
+    galaxyabsmag=np.asarray(galaxyabsmag)
+    assert callable(rprojboundary),"Argument `rprojboundary` must callable function of Mr_int."
+    assert callable(vprojboundary),"Argument `vprojboundary` must callable function of Mr_int."
 
-    giantgroupid = np.copy(giantfofid)
     converged=False
+    groupid = np.arange(starting_id, starting_id+len(galaxyra))
     niter=0
     while (not converged):
-        print(f"Giant-only iterative combination {niter+1} in progress...")
-        oldgiantgroupid = giantgroupid
-        giantgroupid = nearest_neighbor_assign(galaxyra,galaxydec,galaxyz,oldgiantgroupid,\
+        print(f"Dwarf-only iterative combination {niter+1} in progress...")
+        oldgroupid = groupid
+        groupid = nearest_neighbor_assign_dw(galaxyra,galaxydec,galaxyz,galaxyabsmag, oldgroupid,\
                         rprojboundary,vprojboundary,cosmo)
-        converged = np.array_equal(oldgiantgroupid,giantgroupid)
+        converged = np.array_equal(oldgroupid,groupid)
         niter+=1
-    print("Giant-only iterative combination complete.")
-    return giantgroupid
+    print("Dwarf-only iterative combination complete.")
+    return groupid
 
-def nearest_neighbor_assign(galaxyra,galaxydec,galaxyz,grpid,rprojboundary,vprojboundary,cosmo):
+def nearest_neighbor_assign_dw(galaxyra,galaxydec,galaxyz,galaxyabsmag,grpid,rprojboundary,vprojboundary,cosmo):
     """
     Refine input group ID by merging nearest-neighbor groups subject to boundary constraints.
-    For info on arguments, see "giantOnlyICRoutine"
+    For info on arguments, see "dwarfOnlyICRoutine"
 
     Returns
     --------------
@@ -70,11 +71,13 @@ def nearest_neighbor_assign(galaxyra,galaxydec,galaxyz,grpid,rprojboundary,vproj
     """
     # Prepare output array
     groupra, groupdec, groupz = group_skycoords(galaxyra, galaxydec, galaxyz, grpid)
+    groupMint = get_int_mag(galaxyabsmag, grpid)
     gX, gY, gZ = cartesian_from_spherical_z(galaxyra, galaxydec, galaxyz)
 
     # Get unique potential seed groups
     uniqgrpid, uniqind, galaxyidx, seedN = np.unique(grpid, return_index=True, return_inverse=True, return_counts=True)
     seedra, seeddec, seedz = groupra[uniqind], groupdec[uniqind], groupz[uniqind]
+    seedMint = groupMint[uniqind]
     seeddm = cosmo.comoving_transverse_distance(seedz).value
     seedX, seedY, seedZ = cartesian_from_spherical_z(seedra, seeddec, seedz)
     xyz = np.array([seedX, seedY, seedZ]).T
@@ -87,6 +90,7 @@ def nearest_neighbor_assign(galaxyra,galaxydec,galaxyz,grpid,rprojboundary,vproj
     # larger group, if both seed groups would satisfy the Rproj and Vproj requirements
     # when calculated from the center of the larger tentative group.
     n_tent = seedN + seedN[nnind]
+    Mr_tent = -2.5*np.log10(10**(-0.4*seedMint) + 10**(-0.4*seedMint[nnind]))
     G = len(uniqgrpid)
     sumX = np.zeros(G)
     sumY = np.zeros(G)
@@ -110,8 +114,8 @@ def nearest_neighbor_assign(galaxyra,galaxydec,galaxyz,grpid,rprojboundary,vproj
     vpec_i = SPEED_OF_LIGHT*np.abs(tent_z - seedz) / one_plus_z
     vpec_j = SPEED_OF_LIGHT*np.abs(tent_z - seedz[nnind]) / one_plus_z 
 
-    seedi_in = (dperp_i < rprojboundary(n_tent)) & (vpec_i < vprojboundary(n_tent))
-    seedj_in = (dperp_j < rprojboundary(n_tent)) & (vpec_j < vprojboundary(n_tent))
+    seedi_in = (dperp_i < rprojboundary(Mr_tent)) & (vpec_i < vprojboundary(Mr_tent))
+    seedj_in = (dperp_j < rprojboundary(Mr_tent)) & (vpec_j < vprojboundary(Mr_tent))
     recip = nnind[nnind] == np.arange(len(nnind)) # are they each other's own nearest neighbor?
     merge = seedi_in & seedj_in & recip
   
